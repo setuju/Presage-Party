@@ -51,6 +51,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   let rafId = 0;
   let activeMode = 'none';
+  let currentRng = Math.random;
   let distractionTimeout = null;
   let jumpscareTimeout = null;
   let currentLevel = 1;
@@ -77,6 +78,8 @@ document.addEventListener('DOMContentLoaded', () => {
   let f_talkAccumMs = 0;
   let f_lastTalkPenaltyTime = -Infinity;
   let f_lastRatePenaltyTime = -Infinity;
+    f_lastTriggerTick = -1;
+  let f_lastTriggerTick = -1;
 
   let f_blinkCount = 0;
   let f_talkCount = 0;
@@ -207,7 +210,7 @@ document.addEventListener('DOMContentLoaded', () => {
   function triggerDistraction() {
     if (activeMode !== 'flinch' || currentLevel !== 2) return;
 
-    const d = distractions[Math.floor(rng() * distractions.length)];
+    const d = distractions[Math.floor(currentRng() * distractions.length)];
     const el = document.createElement('div');
     el.className = 'distraction-text';
     el.textContent = d.text;
@@ -230,7 +233,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (activeMode !== 'flinch' || currentLevel !== 4) return;
 
     // Randomize face
-    jumpscareFace.textContent = scaryFaces[Math.floor(rng() * scaryFaces.length)];
+    jumpscareFace.textContent = scaryFaces[Math.floor(currentRng() * scaryFaces.length)];
     
     // Play audio
     playScream();
@@ -254,7 +257,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   function playRandomChallengeVideo() {
     if (currentLevel !== 3 || activeMode !== 'flinch' || challengeVideoUrls.length === 0) return;
-    const url = challengeVideoUrls[Math.floor(rng() * challengeVideoUrls.length)];
+    const url = challengeVideoUrls[Math.floor(currentRng() * challengeVideoUrls.length)];
     challengeVideo.src = url;
     challengeVideo.play().catch(e => {
       setTimeout(playRandomChallengeVideo, 1000);
@@ -349,6 +352,7 @@ document.addEventListener('DOMContentLoaded', () => {
     f_talkAccumMs = 0;
     f_lastTalkPenaltyTime = -Infinity;
     f_lastRatePenaltyTime = -Infinity;
+    f_lastTriggerTick = -1;
     f_blinkCount = 0;
     f_talkCount = 0;
     f_rateCount = 0;
@@ -382,6 +386,25 @@ document.addEventListener('DOMContentLoaded', () => {
     for (let i = 0; i < samples.length; i++) {
       if (samples[i].t <= tMs) s = samples[i];
       else break;
+    }
+
+    // Multiplayer Deterministic Event Trigger
+    if (activeMode === 'flinch' && currentLevel > 1) {
+      // Calculate a deterministic interval based on the RNG
+      // For Level 2: trigger every ~4s. For Level 3: trigger every ~5s.
+      const interval = (currentLevel === 2) ? 4000 : 5000;
+      const triggerTick = Math.floor(elapsed / interval);
+      
+      if (triggerTick > f_lastTriggerTick) {
+        f_lastTriggerTick = triggerTick;
+        if (currentLevel === 2) {
+          triggerDistraction();
+        } else if (currentLevel === 3) {
+          playRandomChallengeVideo();
+        } else if (currentLevel === 4) {
+          triggerJumpscare();
+        }
+      }
     }
 
     if (s) {

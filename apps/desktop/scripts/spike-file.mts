@@ -1,4 +1,20 @@
-import { readFileSync } from 'node:fs';
+﻿/**
+ * Phase 0a spike — v4 with JSON replay export.
+ *
+ * Usage:
+ *   pnpm --filter @presage-party/desktop exec tsx scripts/spike-file.mts <video> [--out=<json>]
+ *
+ * The --out argument writes a compact timeline for replay mode:
+ *   {
+ *     "videoPath": "fixtures/face30.mp4",
+ *     "generatedAt": "...",
+ *     "sdkVersion": "3.4.0",
+ *     "durationMs": 73366,
+ *     "samples": [{ "t": 66666, "br": 0.17, "blink": true, "talk": false }, ...],
+ *     "rates":   [{ "t": 10566666, "value": 16.90, "confidence": 36.3, "stable": false }, ...]
+ *   }
+ */
+import { readFileSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import {
   SmartSpectraSDK, ProcessingStatus, SmartSpectraLogLevel,
@@ -21,21 +37,20 @@ function statusName(n: number): string {
   return (['kUninit','kIdle','kStarting','kRunning','kStopping','kError'] as const)[n] ?? `k?(${n})`;
 }
 
-function scrubLandmarks(obj: any): any {
-  if (obj?.face?.landmarks) {
-    for (const lm of obj.face.landmarks) {
-      if (Array.isArray(lm?.value)) lm.value = `[${lm.value.length} points]`;
-    }
-  }
-  return obj;
-}
+interface Sample { t: number; br: number; blink: boolean; talk: boolean; }
+interface Rate   { t: number; value: number; confidence?: number; stable?: boolean; }
 
 async function main(): Promise<void> {
   const apiKey = process.env.SMARTSPECTRA_API_KEY?.trim();
-  const videoPath = process.argv[2];
-  if (!apiKey || !videoPath) { console.error('[spike] FAIL: usage'); process.exitCode = 10; return; }
+  const args = process.argv.slice(2);
+  const videoPath = args.find(a => !a.startsWith('--'));
+  const outPath = args.find(a => a.startsWith('--out='))?.slice(6);
+
+  if (!apiKey) { console.error('[spike] FAIL: no API key'); process.exitCode = 10; return; }
+  if (!videoPath) { console.error('[spike] FAIL: usage: <video> [--out=<json>]'); process.exitCode = 11; return; }
 
   console.log('[spike] config: BREATHING+FACE, enableAccumulatedOutput=true');
+  console.log('[spike] output:', outPath ?? '(none)');
 
   const sdk = new SmartSpectraSDK({
     apiKey, enableTelemetry: false, logLevel: SmartSpectraLogLevel.kInfo,
@@ -43,7 +58,9 @@ async function main(): Promise<void> {
     enableAccumulatedOutput: true,
   });
 
-  let mCount = 0, aCount = 0, eCount = 0, lastStatus = -1;
+  const samples: Sample[] = [];
+  const rates: Rate[] = [];
+  let mCount = 0, aCount = 0, eCount = 0, lastStatus = -1, lastTs = 0;
   const t0 = Date.now();
   const valCounts = new Map<number, number>();
 
@@ -55,24 +72,47 @@ async function main(): Promise<void> {
 
   sdk.on('metrics', (buf, ts) => {
     mCount++;
-    if (mCount % 100 === 0) {
+    lastTs = ts;
+    if (outPath) {
       try {
         const d: any = decodeMetrics(buf);
-        const p = scrubLandmarks(d?.toJSON?.() ?? d);
-        console.log(`[sdk:metrics] #${mCount} ts=${ts}:`);
-        console.log(JSON.stringify(p, null, 2));
-      } catch (e) { console.error('[sdk:metrics] decode failed: ' + (e as Error).message); }
+        const raw = d?.toJSON?.() ?? d;
+        const br = raw?.breathing?.upperTrace?.[0]?.value;
+        const blink = raw?.face?.blinking?.[0]?.stable;
+        const talk  = raw?.face?.talking?.[0]?.stable;
+        if (typeof br === 'number') {
+          samples.push({
+            t: Math.round(ts / 1000),
+            br: Math.round(br * 10000) / 10000,
+            blink: blink === true,
+            talk:  talk === true,
+          });
+        }
+      } catch { /* skip malformed */ }
     }
+    if (mCount % 100 === 0) console.log(`[sdk:metrics] #${mCount} ts=${ts}`);
   });
 
   sdk.on('accumulatedMetrics', (buf, ts) => {
     aCount++;
     console.log(`[sdk:accumulated] #${aCount} ts=${ts}`);
-    try {
-      const d: any = decodeMetrics(buf);
-      const p = scrubLandmarks(d?.toJSON?.() ?? d);
-      console.log(JSON.stringify(p, null, 2));
-    } catch (e) { console.error('[sdk:accumulated] decode failed: ' + (e as Error).message); }
+    if (outPath) {
+      try {
+        const d: any = decodeMetrics(buf);
+        const raw = d?.toJSON?.() ?? d;
+        const rateArr = raw?.breathing?.rate ?? [];
+        for (const r of rateArr) {
+          if (typeof r?.value === 'number') {
+            rates.push({
+              t: Math.round(Number(r.timestamp) / 1000),
+              value: Math.round(r.value * 100) / 100,
+              confidence: typeof r.confidence === 'number' ? Math.round(r.confidence * 10) / 10 : undefined,
+              stable: r.stable === true ? true : undefined,
+            });
+          }
+        }
+      } catch (e) { console.error('[sdk:accumulated] decode failed:', (e as Error).message); }
+    }
   });
 
   sdk.useFile(videoPath, { interframeDelayMs: INTERFRAME_DELAY_MS });
@@ -100,6 +140,20 @@ async function main(): Promise<void> {
   console.log('  errors            =', eCount);
   console.log('  elapsed_ms        =', Date.now() - t0);
   console.log('  validation        =', Object.fromEntries(valCounts));
+
+  if (outPath) {
+    const json = {
+      videoPath,
+      generatedAt: new Date().toISOString(),
+      sdkVersion: SmartSpectraSDK.version,
+      durationMs: Math.round(lastTs / 1000),
+      samples,
+      rates,
+    };
+    writeFileSync(outPath, JSON.stringify(json, null, 2));
+    const bytes = JSON.stringify(json).length;
+    console.log(`[spike] wrote ${outPath} (${samples.length} samples, ${rates.length} rates, ~${Math.round(bytes/1024)} KB)`);
+  }
 
   process.exitCode = exitReason === 'idle' && eCount === 0 ? 0 : (exitReason === 'timeout' ? 2 : 3);
 }

@@ -4,7 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "echo 'server not wired yet \u2014 Phase 3'"
+    "dev": "tsx src/index.ts"
   },
   "devDependencies": {
     "tsx": "^4.19.2",

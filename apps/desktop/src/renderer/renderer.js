@@ -6,7 +6,8 @@ document.addEventListener('DOMContentLoaded', () => {
     rules: document.getElementById('screen-rules'),
     flinch: document.getElementById('screen-flinch'),
     flinchResult: document.getElementById('screen-flinch-result'),
-    player: document.getElementById('screen-player')
+    player: document.getElementById('screen-player'),
+    multiplayer: document.getElementById('screen-multiplayer')
   };
 
   const bgVideo = document.getElementById('bg-video');
@@ -507,5 +508,76 @@ document.addEventListener('DOMContentLoaded', () => {
     show('consent');
   });
 
+
+  // --- MULTIPLAYER LOGIC ---
+  let socket = null;
+  const mpStatus = document.getElementById('mp-status');
+  const btnCreateRoom = document.getElementById('btn-create-room');
+  const btnJoinRoom = document.getElementById('btn-join-room');
+  const inputRoomCode = document.getElementById('input-room-code');
+
+  function connectSocket() {
+    if (socket) return;
+    
+    // Koneksi ke server lokal (port 3000)
+    socket = io('http://localhost:3000');
+
+    socket.on('connect', () => {
+      mpStatus.textContent = 'Connected to server!';
+      mpStatus.style.color = '#4ade80';
+      btnCreateRoom.disabled = false;
+      btnJoinRoom.disabled = false;
+    });
+
+    socket.on('connect_error', () => {
+      mpStatus.textContent = 'Server offline. Start the server first.';
+      mpStatus.style.color = '#ef4444';
+      btnCreateRoom.disabled = true;
+      btnJoinRoom.disabled = true;
+    });
+
+    socket.on('player_joined', (playerId) => {
+      console.log('Opponent joined:', playerId);
+      // Untuk sekarang, kita mulai game Chill Mode sebagai placeholder multiplayer
+      alert('Opponent joined! Starting multiplayer match (placeholder).');
+      startFlinch(1); // Placeholder
+    });
+  }
+
+  document.getElementById('btn-multiplayer').addEventListener('click', () => {
+    show('multiplayer');
+    connectSocket();
+  });
+
+  document.getElementById('btn-mp-back').addEventListener('click', () => {
+    show('consent');
+  });
+
+  btnCreateRoom.addEventListener('click', () => {
+    socket.emit('create_room', (res) => {
+      if (res.success) {
+        mpStatus.innerHTML = `Room Code: <span style="font-size:32px; color:#fff;">${res.roomCode}</span><br><span style="font-size:14px; color:#aaa;">Waiting for opponent...</span>`;
+        btnCreateRoom.disabled = true;
+        btnJoinRoom.disabled = true;
+      }
+    });
+  });
+
+  btnJoinRoom.addEventListener('click', () => {
+    const code = inputRoomCode.value.trim().toUpperCase();
+    if (!code) return;
+    
+    socket.emit('join_room', code, (res) => {
+      if (res.success) {
+        mpStatus.textContent = 'Joined! Starting game...';
+        setTimeout(() => startFlinch(1), 1000); // Placeholder start game
+      } else {
+        mpStatus.textContent = 'Error: ' + res.error;
+        mpStatus.style.color = '#ef4444';
+      }
+    });
+  });
+
   show('consent');
-});
+})();
+

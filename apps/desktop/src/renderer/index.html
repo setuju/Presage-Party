@@ -140,9 +140,10 @@
       <button id="btn-level1" class="btn btn-primary" style="flex:1;">Chill Mode</button>
       <button id="btn-level2" class="btn btn-level2" style="flex:1;">Seriously?</button>
       <button id="btn-level3" class="btn btn-level3" style="flex:1;">Why So Serious?</button>
+      <button id="btn-level4" class="btn btn-level4" style="flex:1;">Don't Scream (Horror)</button>
     </div>
     <div style="display:flex; gap:12px; margin-top:12px; flex-wrap:wrap;">
-      <button id="btn-level4" class="btn btn-level4" style="flex:1;">Don't Scream (Horror)</button>
+      <button id="btn-multiplayer" class="btn" style="flex:1; border-color: #3b82f6; color: #3b82f6; background: #0f172a;">Multiplayer Mode</button>
     </div>
     <div style="margin-top:16px;">
       <button id="btn-rules" class="btn" style="width:100%; border-color:#555;">View Game Rules</button>
@@ -186,6 +187,30 @@
 
     <div style="margin-top:48px; text-align:center; padding-bottom: 40px;">
       <button id="btn-rules-back" class="btn btn-primary" style="padding:16px 40px;">I Understand</button>
+    </div>
+  </div>
+</div>
+
+
+<!-- SCREEN: MULTIPLAYER MENU -->
+<div id="screen-multiplayer" class="screen">
+  <div class="consent-wrap rules-content" style="max-width: 500px; margin-top: 100px; text-align: center;">
+    <h1 style="color:#fff;">Multiplayer Royale</h1>
+    <p>Connect with a friend on the same network.</p>
+    
+    <div id="mp-status" style="color: #fbbf24; margin-bottom: 24px; font-weight: bold;">Connecting to server...</div>
+
+    <div style="display: flex; flex-direction: column; gap: 16px; margin-top: 32px;">
+      <button id="btn-create-room" class="btn btn-primary" disabled>Create Room</button>
+      
+      <div style="display: flex; gap: 8px;">
+        <input type="text" id="input-room-code" placeholder="ENTER ROOM CODE" style="flex: 1; padding: 14px; border-radius: 8px; border: 1px solid #444; background: #111; color: #fff; font-size: 16px; text-transform: uppercase; text-align: center;" maxlength="4">
+        <button id="btn-join-room" class="btn btn-level2" disabled>Join</button>
+      </div>
+    </div>
+
+    <div style="margin-top: 32px;">
+      <button id="btn-mp-back" class="btn" style="width: 100%;">Back to Main Menu</button>
     </div>
   </div>
 </div>
@@ -268,6 +293,7 @@
   </div>
 </div>
 
+<script src="./socket.io.min.js"></script>
 <script src="./renderer.js"></script>
 </body>
 </html>

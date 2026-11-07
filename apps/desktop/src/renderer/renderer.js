@@ -512,25 +512,51 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   // INIT
-  async function initApp() {
-    const res = await window.presage.checkAssets();
-    if (res.ready) {
-      assetsReady = true;
-      assetStatus.textContent = '✓ Game materials ready.';
-      assetStatus.style.color = '#4ade80';
-      if (socket && socket.connected) socket.emit('assets_ready');
+  function initApp() {
+    // STEP 1: Pasang listener tombol Continue DULUAN (sebelum await apa pun)
+    // Ini memastikan tombol selalu berfungsi meski checkAssets() crash.
+    const btnSaveName = document.getElementById('btn-save-name');
+    if (btnSaveName) {
+      btnSaveName.addEventListener('click', () => {
+        const name = document.getElementById('input-username').value.trim();
+        if (!name) { alert('Please enter a name'); return; }
+        myUsername = name;
+        show('consent');
+      });
+      console.log('[init] btn-save-name listener attached');
     } else {
-      assetsReady = false;
-      assetStatus.textContent = `Missing ${res.missing} video(s). Level 3 is disabled until you pull the full repository.`;
-      assetStatus.style.color = '#fbbf24';
+      console.error('[init] btn-save-name NOT FOUND in DOM');
     }
 
-    document.getElementById('btn-save-name').addEventListener('click', () => {
-      const name = document.getElementById('input-username').value.trim();
-      if (!name) { alert('Please enter a name'); return; }
-      myUsername = name;
-      show('consent');
-    });
+    // STEP 2: Tampilkan layar name segera (tidak tunggu IPC)
+    show('name');
+
+    // STEP 3: Async check assets di background (boleh gagal, tidak memblokir UI)
+    (async () => {
+      try {
+        if (!window.presage || typeof window.presage.checkAssets !== 'function') {
+          console.warn('[init] presage.checkAssets unavailable - skipping asset check');
+          assetStatus.textContent = 'Asset check unavailable (preload missing). Level 3 disabled.';
+          assetStatus.style.color = '#fbbf24';
+          return;
+        }
+        const res = await window.presage.checkAssets();
+        if (res.ready) {
+          assetsReady = true;
+          assetStatus.textContent = '✓ Game materials ready.';
+          assetStatus.style.color = '#4ade80';
+          if (socket && socket.connected) socket.emit('assets_ready');
+        } else {
+          assetsReady = false;
+          assetStatus.textContent = `Missing ${res.missing} video(s). Level 3 is disabled.`;
+          assetStatus.style.color = '#fbbf24';
+        }
+      } catch (err) {
+        console.error('[init] checkAssets failed:', err);
+        assetStatus.textContent = 'Asset check failed. Level 3 disabled.';
+        assetStatus.style.color = '#ef4444';
+      }
+    })();
 
     document.getElementById('btn-level1').addEventListener('click', () => startFlinch(1, parseInt(document.getElementById('select-solo-duration').value, 10)));
     document.getElementById('btn-level2').addEventListener('click', () => startFlinch(2, parseInt(document.getElementById('select-solo-duration').value, 10)));
@@ -605,8 +631,6 @@ document.addEventListener('DOMContentLoaded', () => {
     document.addEventListener('visibilitychange', () => {
       if (socket && socket.connected) socket.emit('visibility_change', document.visibilityState === 'visible');
     });
-
-    show('name');
   }
 
   initApp();

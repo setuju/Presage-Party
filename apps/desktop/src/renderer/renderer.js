@@ -221,7 +221,10 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
   function show(name) {
-    Object.keys(screens).forEach(k => screens[k].classList.toggle('active', k === name));
+    Object.keys(screens).forEach(k => {
+      const el = screens[k];
+      if (el) el.classList.toggle('active', k === name); // Cek null
+    });
   }
 
   async function loadData() {

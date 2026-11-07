@@ -14,8 +14,8 @@ interface Room { code: string; host: string; guest: string | null; startAt: numb
 const rooms = new Map<string, Room>();
 const socketToRoom = new Map<string, string>();
 
-process.on('uncaughtException', (err) => console.error('[FATAL] Uncaught Exception:', err));
-process.on('unhandledRejection', (err) => console.error('[FATAL] Unhandled Rejection:', err));
+process.on('uncaughtException', (err) => console.error('[FATAL]', err));
+process.on('unhandledRejection', (err) => console.error('[FATAL]', err));
 
 io.on('connection', (socket) => {
   console.log(`[+] Client connected: ${socket.id}`);
@@ -57,9 +57,9 @@ io.on('connection', (socket) => {
 
       room.level = (data && data.level) || 1;
       room.startAt = Date.now() + 3000;
-      const seed = Math.floor(Math.random() * 1000000); // NEW: Random seed
       room.results = { host: null, guest: null };
-      io.to(code).emit('game_start', { startAt: room.startAt, level: room.level, seed });
+      
+      io.to(code).emit('game_start', { startAt: room.startAt, level: room.level, roomCode: code });
       console.log(`[game] room ${code} starting at ${room.startAt} level ${room.level}`);
       if (typeof callback === 'function') callback({ success: true });
     } catch (e) { console.error(e); if (typeof callback === 'function') callback({ success: false }); }

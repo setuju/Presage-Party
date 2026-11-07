@@ -541,11 +541,12 @@ document.addEventListener('DOMContentLoaded', () => {
       if (levelSelector) levelSelector.style.display = 'none';
     });
 
-    socket.on('cheat_detected', (cheaterId) => {
-      if (cheaterId === socket.id) {
-        if (activeMode === 'flinch') { f_composure = 0; statusText.textContent = "DISQUALIFIED: Window minimized!"; }
-      } else {
-        mpStatus.textContent = "Opponent disqualified for minimizing window."; mpStatus.style.color = '#ef4444';
+    socket.on('cheat_penalty', (amount) => {
+      if (activeMode === 'flinch') {
+        f_composure = Math.max(0, f_composure - amount);
+        updateFlinchUI();
+        statusText.textContent = `FOCUS! (-${amount} composure)`;
+        popAlert(`-${amount}`);
       }
     });
   }

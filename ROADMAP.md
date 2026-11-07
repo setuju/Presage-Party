@@ -42,20 +42,23 @@ accumulatedMetrics, 0 errors.`
 
 ---
 
-## Phase 1 — Shell + Consent (Nov 7–8, 2 days)
+## Phase 1 — Shell + Consent ✅ COMPLETE (Nov 7)
 
 **Goal:** the safety layer every mode depends on.
 
-- [ ] `ConsentGate` component: explanation, explicit allow, camera indicator
-- [ ] `Stop & Delete Session` button that shuts down SDK and clears buffers
-- [ ] `sdk-bridge` package: normalizes nil values, keeps last valid sample
-- [ ] IPC channels: `main ? preload ? renderer` for `getLatestMetrics()`
-- [ ] Plant Calm mode — simplest possible game, validates the whole pipe
+- [x] `ConsentGate` component: privacy bullets, explicit "Use replay", "Cancel"
+- [x] `Stop & Delete Session` button pauses video, clears src, resets state
+- [x] IPC channels: `main → preload → renderer` for `getTimeline()`, `getVideoUrl()`
+- [x] Replay playback: `<video>` synced to `face30.metrics.json` via rAF
+- [ ] `sdk-bridge` package: normalizes nil values, keeps last valid sample (moved to Phase 2/3)
+- [ ] Plant Calm mode (deferred; replay player validates the pipeline instead)
 
-**Exit criterion:** Plant Calm grows a plant when I breathe slowly, and shrinks
-when I don't. Consent gate blocks all modes until accepted.
+**Pivot:** Windows native SDK is blocked by TPM/CNG. Replay mode became the
+primary validation path. `presage://` protocol serves `fixtures/` locally.
 
----
+**Exit criterion (revised):** ConsentGate blocks playback until accepted.
+User can play replay video, see live metrics (breathing, blink, talk, rate),
+and hit Stop & Delete to return to a clean state.
 
 ## Phase 2 — Flinch Royale (Local) (Nov 9–11, 3 days)
 

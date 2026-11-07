@@ -6,29 +6,43 @@ This project does not follow strict SemVer — it is a hackathon submission.
 ## [Unreleased]
 
 ### Added
-- `--out=<path>` flag on `spike-file.mts` — writes compact replay JSON
-  (`videoPath`, `generatedAt`, `sdkVersion`, `durationMs`, `samples[]`,
-  `rates[]`). face30.mp4 output: 739 samples, 30 rates, ~70 KB.
+- (populate as you build)
+
+---
+
+## [0.2.0] — 2026-11-07 — Phase 1 COMPLETE
+
+### Added
+- Electron shell: `main` (window, IPC), `preload` (contextBridge), `renderer`
+  (plain HTML/JS, no bundler).
+- `presage://` custom protocol serving `fixtures/` via `net.fetch`.
+- `ConsentGate`: 3-screen state machine (consent → player → stopped).
+  Privacy bullets + explicit "Use replay" / "Cancel".
+- Replay playback: `<video>` synced to `face30.metrics.json` via
+  `requestAnimationFrame`, cursor advances on `sample.t` with tolerance for
+  duplicate timestamps.
+- Live metrics panel: breathing amplitude, nearest rate + confidence,
+  blink/talk flags, stable-rate indicator.
+- "Stop & Delete" pauses video, removes `src`, resets state, moves to stopped.
 - `@types/node@^22.10.0` devDependency for `apps/desktop`.
+- `--out=<path>` flag on `spike-file.mts` — writes compact replay JSON.
 
 ### Changed
 - Phase 1 data source is replay JSON on disk, not a runtime bridge.
-  WSL runs the spike once; Windows Electron reads the JSON.
 - Fixtures convention: `apps/desktop/fixtures/` because `pnpm --filter`
   changes CWD to the package root.
+- Windows native SDK blocked by TPM/CNG; hybrid architecture
+  (WSL processing, Windows UI) adopted for replay mode.
 
 ### Fixed
-- `spike-file.mts`: EOF detection now polls `sdk.processingStatus` via
+- `spike-file.mts`: EOF detection polls `sdk.processingStatus` via
   `setImmediate` (SDK 3.4.0 does not reliably emit `kRunning` or terminal
-  `kIdle` from `processingStatus` for file playback). Falls back to
-  `waitUntilComplete()` after 30 s if polling never leaves `kIdle`.
-- PowerShell: scripts >5 lines are written to `.ps1` first, then
-  executed. Prevents PSReadLine buffer-overflow mid-paste.
-- Bash paste bubbles: no `set -e` at top level; see `LESSONS.md` L016
-  and L017.
-
-### Security
-- (populate for any security-relevant change)
+  `kIdle` for file playback).
+- PowerShell scripts >5 lines are written to `.ps1` first, then executed
+  (see `LESSONS.md` L017).
+- Bash paste bubbles: no `set -e` at top level (see `LESSONS.md` L016).
+- Windows: zombie Electron process locks `dist/`; kill before `tsc`
+  (see `LESSONS.md` L019).
 
 ---
 

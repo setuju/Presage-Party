@@ -12,7 +12,10 @@ This project does not follow strict SemVer — it is a hackathon submission.
 - (populate as you change)
 
 ### Fixed
-- (populate as you fix)
+- `spike-file.mts`: EOF detection now polls `sdk.processingStatus` via
+  `setImmediate` (SDK 3.4.0 does not reliably emit `kRunning` or terminal
+  `kIdle` from `processingStatus` for file playback). Falls back to
+  `waitUntilComplete()` after 30 s if polling never leaves `kIdle`.
 
 ### Security
 - (populate for any security-relevant change)

@@ -5,11 +5,17 @@
  * authenticates with the API key, runs the file playback pipeline,
  * decodes metrics (if any), and shuts down cleanly.
  *
- * Does NOT need a camera. Does NOT need Electron. Works on WSL2.
+ * Empirical finding (2026-11-07, SDK 3.4.0):
+ *   `processingStatus` JS event does NOT reliably emit kRunning or the
+ *   terminal kIdle transition for file playback. `waitUntilComplete()` is
+ *   documented but blocks the JS event loop, preventing metrics callbacks
+ *   from firing during the block. Therefore we poll `sdk.processingStatus`
+ *   in a setImmediate loop, and fall back to waitUntilComplete() only if
+ *   polling never leaves kIdle within 30 s.
  *
  * Usage:
  *   SMARTSPECTRA_API_KEY=... pnpm --filter @presage-party/desktop \
- *     exec tsx scripts/spike-file.mts fixtures/testsrc.mp4
+ *     exec tsx scripts/spike-file.mts fixtures/face.mp4
  */
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
@@ -22,8 +28,9 @@ import {
 } from '@smartspectra/node-sdk';
 
 const TIMEOUT_MS = 180_000;
+const POLL_FALLBACK_AFTER_MS = 30_000;
+const METRICS_DRAIN_MS = 100;
 
-// Best-effort .env loader; does not override existing env vars.
 try {
   const text = readFileSync(resolve(process.cwd(), '.env'), 'utf8');
   for (const line of text.split('\n')) {
@@ -33,11 +40,11 @@ try {
     }
   }
 } catch {
-  /* no .env, rely on process.env */
+  /* no .env */
 }
 
 function statusName(n: number): string {
-  const m: Record<number, string> = {
+  const map: Record<number, string> = {
     [ProcessingStatus.kUninitialized]: 'kUninitialized',
     [ProcessingStatus.kIdle]: 'kIdle',
     [ProcessingStatus.kStarting]: 'kStarting',
@@ -45,11 +52,11 @@ function statusName(n: number): string {
     [ProcessingStatus.kStopping]: 'kStopping',
     [ProcessingStatus.kError]: 'kError',
   };
-  return m[n] ?? `kUnknown(${n})`;
+  return map[n] ?? `kUnknown(${n})`;
 }
 
 function errorName(n: number): string {
-  const m: Record<number, string> = {
+  const map: Record<number, string> = {
     [SmartSpectraErrorCode.kOk]: 'kOk',
     [SmartSpectraErrorCode.kInvalidState]: 'kInvalidState',
     [SmartSpectraErrorCode.kAuthenticationFailed]: 'kAuthenticationFailed',
@@ -57,7 +64,7 @@ function errorName(n: number): string {
     [SmartSpectraErrorCode.kCreditExhausted]: 'kCreditExhausted',
     [SmartSpectraErrorCode.kNetworkError]: 'kNetworkError',
   };
-  return m[n] ?? `code_${n}`;
+  return map[n] ?? `code_${n}`;
 }
 
 async function main(): Promise<void> {
@@ -65,7 +72,7 @@ async function main(): Promise<void> {
   const videoPath = process.argv[2];
 
   if (!apiKey) {
-    console.error('[spike] FAIL: SMARTSPECTRA_API_KEY not set (env or apps/desktop/.env)');
+    console.error('[spike] FAIL: SMARTSPECTRA_API_KEY not set');
     process.exitCode = 10;
     return;
   }
@@ -81,27 +88,13 @@ async function main(): Promise<void> {
 
   const sdk = new SmartSpectraSDK({
     apiKey,
-    enableTelemetry: false, // hard rule — SYSTEM_PROMPT.md §5
+    enableTelemetry: false,
     logLevel: SmartSpectraLogLevel.kInfo,
   });
 
   let metricsCount = 0;
   let firstMetricsDumped = false;
   let errorCount = 0;
-  let lastStatus = -1;
-  let hasBeenRunning = false;
-
-  sdk.on('processingStatus', (status) => {
-    if (status === ProcessingStatus.kRunning) hasBeenRunning = true;
-    if (status !== lastStatus) {
-      console.log(`[sdk:status] ${statusName(status)} (${status})`);
-      lastStatus = status;
-    }
-  });
-
-  sdk.on('validationStatus', (code, ts, hint) => {
-    console.log(`[sdk:validation] code=${code} ts=${ts} hint=${JSON.stringify(hint)}`);
-  });
 
   sdk.on('error', (code, message, retryable) => {
     errorCount++;
@@ -119,7 +112,6 @@ async function main(): Promise<void> {
       console.error(`[sdk:metrics] decode failed: ${(err as Error).message}`);
       return;
     }
-
     if (!firstMetricsDumped) {
       firstMetricsDumped = true;
       console.log('[sdk:metrics] FIRST PACKET — full decoded shape:');
@@ -141,27 +133,49 @@ async function main(): Promise<void> {
   console.log('[spike] starting file playback...');
   sdk.start();
 
-  const settled = await new Promise<boolean>((resolvePromise) => {
-    const timer = setTimeout(() => resolvePromise(false), TIMEOUT_MS);
-    sdk.on('processingStatus', (status) => {
-      if (hasBeenRunning && status === ProcessingStatus.kIdle) {
-        clearTimeout(timer);
-        resolvePromise(true);
-      }
-      if (status === ProcessingStatus.kError) {
-        clearTimeout(timer);
-        resolvePromise(false);
-      }
-    });
-  });
+  const startedAt = Date.now();
+  let settled = false;
+  let sawNonIdle = false;
+  let lastPolledStatus = -1;
+  let usedFallback = false;
 
-  console.log(`[spike] settled=${settled} metrics=${metricsCount} errors=${errorCount}`);
+  while (Date.now() - startedAt < TIMEOUT_MS) {
+    await new Promise<void>((r) => setImmediate(r));
+
+    const st = sdk.processingStatus;
+    if (st !== lastPolledStatus) {
+      console.log(
+        `[spike:poll] status=${statusName(st)} (${st}) t=${Date.now() - startedAt}ms`,
+      );
+      lastPolledStatus = st;
+    }
+    if (st !== ProcessingStatus.kIdle) sawNonIdle = true;
+    if (st === ProcessingStatus.kError) break;
+    if (sawNonIdle && st === ProcessingStatus.kIdle) {
+      settled = true;
+      break;
+    }
+
+    if (!sawNonIdle && Date.now() - startedAt > POLL_FALLBACK_AFTER_MS) {
+      console.log(
+        '[spike:poll] never saw non-idle; falling back to waitUntilComplete()',
+      );
+      usedFallback = true;
+      const remaining = TIMEOUT_MS - (Date.now() - startedAt);
+      settled = sdk.waitUntilComplete(remaining);
+      break;
+    }
+  }
+
+  await new Promise<void>((r) => setTimeout(r, METRICS_DRAIN_MS));
 
   await sdk.destroy();
-  console.log('[spike] destroyed cleanly');
+  console.log(
+    `[spike] destroyed. settled=${settled} fallback=${usedFallback} metrics=${metricsCount} errors=${errorCount}`,
+  );
 
   if (!settled) {
-    console.error(`[spike] TIMEOUT after ${TIMEOUT_MS} ms (pipeline never reached kIdle)`);
+    console.error(`[spike] TIMEOUT after ${TIMEOUT_MS} ms`);
     process.exitCode = 2;
     return;
   }

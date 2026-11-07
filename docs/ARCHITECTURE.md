@@ -1,15 +1,15 @@
 # Architecture — Presage Party
 
-> 🚧 PLACEHOLDER. File ini disebut di `README.md` dan `SYSTEM_PROMPT.md`
-> tetapi isi lengkapnya ditulis di Phase 1 (lihat `ROADMAP.md`).
+> 🚧 PLACEHOLDER. This file is referenced in `README.md` and `SYSTEM_PROMPT.md`
+> but the full content will be written in Phase 1 (see `ROADMAP.md`).
 >
-> Keputusan sementara: lihat `DEV_NOTES.md` § Recent decisions dan
+> Interim decisions: see `DEV_NOTES.md` § Recent decisions and
 > `docs/SECURITY.md` trust boundaries.
 
 ## TODO
 
-- [ ] Diagram proses (main / preload / renderer / server)
-- [ ] Kontrak IPC (`getLatestMetrics`, `ConsentGate`, shutdown)
-- [ ] Batas paket: `packages/shared` (types + signing + plausibility)
-- [ ] Sumber sample: `useFile` (replay) vs `useMediaStream` (live)
-- [ ] Alasan Socket.IO vs WebRTC (kill-list sudah menetapkan)
+- [ ] Process diagram (main / preload / renderer / server)
+- [ ] IPC contract (`getLatestMetrics`, `ConsentGate`, shutdown)
+- [ ] Package boundaries: `packages/shared` (types + signing + plausibility)
+- [ ] Sample sources: `useFile` (replay) vs `useMediaStream` (live)
+- [ ] Rationale for Socket.IO vs WebRTC (kill-list already settled)

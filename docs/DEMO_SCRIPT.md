@@ -1,14 +1,14 @@
 # Demo Script — Presage Party
 
-> ?? PLACEHOLDER. File ini disebut di `ROADMAP.md` (Phase 6) tetapi
-> isi lengkapnya ditulis di Phase 5, bukan Phase 6 (lihat `LESSONS.md` L010).
+> 🚧 PLACEHOLDER. This file is referenced in `ROADMAP.md` (Phase 6) but
+> the full content will be written in Phase 5, not Phase 6 (see `LESSONS.md` L010).
 >
-> Aturan dari `PERSONAS.md` (Iris): 20 detik pertama **wajib** memperlihatkan
-> sinyal live berubah dan game merespons.
+> Rule from `PERSONAS.md` (Iris): the first 20 seconds **must** show
+> a live signal changing and the game responding.
 
 ## TODO
 
-- [ ] Storyboard 180 detik
-- [ ] Shot list: live SDK ? gameplay ? consent gate ? replay mode
-- [ ] Narasi (3 kalimat pembuka yang menyebut SmartSpectra)
+- [ ] 180-second storyboard
+- [ ] Shot list: live SDK → gameplay → consent gate → replay mode
+- [ ] Narration (3 opening sentences mentioning SmartSpectra)
 - [ ] Backup take

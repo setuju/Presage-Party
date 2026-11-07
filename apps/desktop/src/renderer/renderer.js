@@ -586,14 +586,21 @@ document.addEventListener('DOMContentLoaded', () => {
         mpStatus.style.color = '#ef4444';
         return;
       }
+      
+      // Disable instantly to prevent spam
+      btnCreateRoom.disabled = true; 
+      btnJoinRoom.disabled = true;
+      
       const pwd = inputCreatePassword.value.trim();
       socket.emit('create_room', { password: pwd, name: myUsername }, (res) => {
         console.log('[socket] create_room ack:', res);
         if (res.success) {
           myRoleInRoom = 'host';
           mpStatus.innerHTML = `Room Code: <span style="font-size:32px; color:#fff;">${res.roomCode}</span>${pwd ? ' (Private)' : ''}<br><span style="font-size:14px; color:#aaa;">Waiting for opponent...</span>`;
-          btnCreateRoom.disabled = true; btnJoinRoom.disabled = true;
         } else {
+          // Re-enable on failure
+          btnCreateRoom.disabled = false; 
+          btnJoinRoom.disabled = false;
           mpStatus.textContent = 'Error: ' + (res.error || 'Unknown error');
           mpStatus.style.color = '#ef4444';
         }

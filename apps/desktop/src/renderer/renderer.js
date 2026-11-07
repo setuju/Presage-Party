@@ -580,21 +580,38 @@ document.addEventListener('DOMContentLoaded', () => {
     if (retryBtn) retryBtn.addEventListener('click', () => { if (socket) { socket.disconnect(); socket = null; } mpStatus.textContent = 'Reconnecting...'; connectSocket(); });
 
     btnCreateRoom.addEventListener('click', () => {
+      console.log('[ui] Create Room clicked');
+      if (!socket || !socket.connected) {
+        mpStatus.textContent = 'Error: Not connected to server.';
+        mpStatus.style.color = '#ef4444';
+        return;
+      }
       const pwd = inputCreatePassword.value.trim();
       socket.emit('create_room', { password: pwd, name: myUsername }, (res) => {
+        console.log('[socket] create_room ack:', res);
         if (res.success) {
           myRoleInRoom = 'host';
           mpStatus.innerHTML = `Room Code: <span style="font-size:32px; color:#fff;">${res.roomCode}</span>${pwd ? ' (Private)' : ''}<br><span style="font-size:14px; color:#aaa;">Waiting for opponent...</span>`;
           btnCreateRoom.disabled = true; btnJoinRoom.disabled = true;
+        } else {
+          mpStatus.textContent = 'Error: ' + (res.error || 'Unknown error');
+          mpStatus.style.color = '#ef4444';
         }
       });
     });
 
     btnJoinRoom.addEventListener('click', () => {
+      console.log('[ui] Join Room clicked');
+      if (!socket || !socket.connected) {
+        mpStatus.textContent = 'Error: Not connected to server.';
+        mpStatus.style.color = '#ef4444';
+        return;
+      }
       const code = inputRoomCode.value.trim().toUpperCase();
       const pwd = inputRoomPassword.value.trim();
       if (!code) return;
       socket.emit('join_room', { code, password: pwd, name: myUsername }, (res) => {
+        console.log('[socket] join_room ack:', res);
         if (!res.success) { mpStatus.textContent = 'Error: ' + res.error; mpStatus.style.color = '#ef4444'; }
       });
     });

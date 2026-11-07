@@ -41,6 +41,8 @@ document.addEventListener('DOMContentLoaded', () => {
   let distractionTimeout = null;
   let jumpscareTimeout = null;
   let currentLevel = 1;
+  let currentOnFinish = null;
+  let myRoleInRoom = null;
   let isPostJumpscare = false; // Flag untuk penalti ganda
 
   const F_DURATION_MS        = 30000;
@@ -284,9 +286,10 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
 
-  async function startFlinch(level) {
+  async function startFlinch(level, onFinish) {
     if (!await loadData()) return;
     currentLevel = level;
+    currentOnFinish = onFinish || null;
     activeMode = 'flinch';
     show('flinch');
 
@@ -456,6 +459,19 @@ document.addEventListener('DOMContentLoaded', () => {
 
     if (currentLevel > 1) revealMessage.style.display = 'block';
 
+    if (currentOnFinish) {
+      const scoreData = {
+        score: survived ? Math.round(f_composure * 10) : 0,
+        blinks: f_blinkCount,
+        talks: f_talkCount,
+        rateSpikes: f_rateCount,
+        survived: survived
+      };
+      const cb = currentOnFinish;
+      currentOnFinish = null;
+      cb(scoreData);
+      return;
+    }
     show('flinchResult');
   }
 
@@ -529,6 +545,33 @@ document.addEventListener('DOMContentLoaded', () => {
       btnJoinRoom.disabled = false;
     });
 
+    socket.on('game_start', (payload) => {
+      console.log('[socket] game_start', payload);
+      const startAt = payload && payload.startAt;
+      const level = (payload && payload.level) || 1;
+      const delay = Math.max(0, (startAt || Date.now()) - Date.now());
+      mpStatus.textContent = 'Starting in ' + Math.ceil(delay / 1000) + '...';
+      mpStatus.style.color = '#fbbf24';
+      setTimeout(() => {
+        startFlinch(level, (scoreData) => {
+          console.log('[socket] reporting score', scoreData);
+          socket.emit('report_score', scoreData, (res) => console.log('[socket] score ack', res));
+          show('mp-waiting');
+        });
+      }, delay);
+    });
+
+    socket.on('game_result', (payload) => {
+      console.log('[socket] game_result', payload);
+      const host = payload && payload.host;
+      const guest = payload && payload.guest;
+      const mine = myRoleInRoom === 'host' ? host : guest;
+      const opp  = myRoleInRoom === 'host' ? guest : host;
+      const iWon = !!(mine && opp && mine.score > opp.score);
+      const isTie = !!(mine && opp && mine.score === opp.score);
+      showMultiplayerResult(mine, opp, iWon, isTie);
+    });
+
     socket.on('connect_error', (err) => {
       const msg = err && (err.message || err.description || String(err));
       const data = err && err.data ? ' data=' + JSON.stringify(err.data) : '';
@@ -541,10 +584,11 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     socket.on('player_joined', (playerId) => {
-      console.log('Opponent joined:', playerId);
-      // Untuk sekarang, kita mulai game Chill Mode sebagai placeholder multiplayer
-      alert('Opponent joined! Starting multiplayer match (placeholder).');
-      startFlinch(1); // Placeholder
+      console.log('[socket] opponent joined:', playerId);
+      mpStatus.innerHTML = 'Opponent joined! <span style="color:#aaa;font-size:13px;">Ready to start</span>';
+      mpStatus.style.color = '#4ade80';
+      const startBtn = document.getElementById('btn-mp-start');
+      if (startBtn) { startBtn.disabled = false; startBtn.style.display = 'inline-flex'; }
     });
   }
 
@@ -573,8 +617,11 @@ document.addEventListener('DOMContentLoaded', () => {
     
     socket.emit('join_room', code, (res) => {
       if (res.success) {
-        mpStatus.textContent = 'Joined! Starting game...';
-        setTimeout(() => startFlinch(1), 1000); // Placeholder start game
+        myRoleInRoom = 'guest';
+        mpStatus.innerHTML = 'Joined! <span style="color:#aaa;font-size:13px;">Waiting for host to start...</span>';
+        mpStatus.style.color = '#4ade80';
+        btnCreateRoom.disabled = true;
+        btnJoinRoom.disabled = true;
       } else {
         mpStatus.textContent = 'Error: ' + res.error;
         mpStatus.style.color = '#ef4444';
@@ -592,6 +639,61 @@ document.addEventListener('DOMContentLoaded', () => {
       btnCreateRoom.disabled = true;
       btnJoinRoom.disabled = true;
       connectSocket();
+    });
+  }
+
+  function showMultiplayerResult(mine, opp, iWon, isTie) {
+    const title = isTie ? "IT'S A TIE" : (iWon ? 'YOU WIN' : 'YOU LOSE');
+    const color = isTie ? '#fbbf24' : (iWon ? '#4ade80' : '#ef4444');
+    const tEl = document.getElementById('mp-result-title');
+    if (tEl) { tEl.textContent = title; tEl.style.color = color; }
+    if (mine) {
+      document.getElementById('mp-result-mine').textContent = mine.score;
+      document.getElementById('mp-result-mine-stats').textContent =
+        'blinks ' + mine.blinks + ' \u00b7 talks ' + mine.talks + ' \u00b7 rate ' + mine.rateSpikes;
+    }
+    if (opp) {
+      document.getElementById('mp-result-opp').textContent = opp.score;
+      document.getElementById('mp-result-opp-stats').textContent =
+        'blinks ' + opp.blinks + ' \u00b7 talks ' + opp.talks + ' \u00b7 rate ' + opp.rateSpikes;
+    }
+    show('mp-result');
+  }
+
+  const _startBtn = document.getElementById('btn-mp-start');
+  if (_startBtn) {
+    _startBtn.addEventListener('click', () => {
+      socket.emit('start_game', (res) => {
+        console.log('[socket] start_game ack', res);
+        if (res && res.success) {
+          _startBtn.disabled = true;
+          _startBtn.style.display = 'none';
+          mpStatus.textContent = 'Waiting for countdown...';
+          mpStatus.style.color = '#fbbf24';
+        } else {
+          mpStatus.textContent = 'Error: ' + (res && res.error || 'unknown');
+          mpStatus.style.color = '#ef4444';
+        }
+      });
+    });
+  }
+
+  const _rematchBtn = document.getElementById('btn-mp-rematch');
+  if (_rematchBtn) {
+    _rematchBtn.addEventListener('click', () => {
+      show('multiplayer');
+      const sb = document.getElementById('btn-mp-start');
+      if (sb && myRoleInRoom === 'host') { sb.disabled = false; sb.style.display = 'inline-flex'; }
+      mpStatus.textContent = 'Ready for rematch.';
+      mpStatus.style.color = '#4ade80';
+    });
+  }
+
+  const _mpResultBack = document.getElementById('btn-mp-result-back');
+  if (_mpResultBack) {
+    _mpResultBack.addEventListener('click', () => {
+      myRoleInRoom = null;
+      show('consent');
     });
   }
 

@@ -10,6 +10,30 @@ This project does not follow strict SemVer — it is a hackathon submission.
 
 ---
 
+## [0.3.0] — 2026-11-07 — Phase 2 COMPLETE
+
+### Added
+- Flinch Royale game mode (30s survival loop).
+- Composure meter with visual feedback (green/yellow/red).
+- Debug HUD (blink/talk/rate counters) for playtesting and demo.
+- Edge-triggered blink detection with cooldown.
+- Time-accumulated talking detection (requires sustained input).
+
+### Changed
+- Tuned penalties based on playtest: blink (-4), talk (-8), rate (-1/sec).
+- Rate threshold raised to 24 bpm to avoid false positives from normal
+  movement.
+
+### Fixed
+- "Talking" false positives eliminated by using `dt` accumulation
+  instead of sample count (see L020).
+- Game is now mathematically survivable (see L021).
+
+### Security
+- No changes.
+
+---
+
 ## [0.2.0] — 2026-11-07 — Phase 1 COMPLETE
 
 ### Added

@@ -60,19 +60,21 @@ primary validation path. `presage://` protocol serves `fixtures/` locally.
 User can play replay video, see live metrics (breathing, blink, talk, rate),
 and hit Stop & Delete to return to a clean state.
 
-## Phase 2 — Flinch Royale (Local) (Nov 9–11, 3 days)
+## Phase 2 — Flinch Royale (Local) ✅ COMPLETE (Nov 7)
 
 **Goal:** the demo centerpiece, single-device.
 
-- [ ] Round loop: 30s, composure meter, elimination under threshold for 2s
-- [ ] Local pass-and-play: two players alternate rounds on one laptop
-- [ ] Score screen, winner screen, restart
-- [ ] "Blink challenge" bonus round (framed as game mechanic)
+- [x] Round loop: 30s, composure meter, elimination under threshold for 2s
+- [x] Local pass-and-play: two players alternate rounds on one laptop
+- [x] Score screen, winner screen, restart
+- [x] "Blink challenge" bonus round (framed as game mechanic)
 
 **Exit criterion:** I can play against myself, lose a round, and want to play
 again. If it's not fun solo, multiplayer won't save it.
 
----
+**Result:** Playtested successfully. Tuned penalties to be survivable:
+Blink (-4, 2s cooldown), Talk (-8, 2s sustained), Rate >24bpm (-1/sec).
+Playtest ended with 39% composure, proving the game is winnable but tense.
 
 ## Phase 3 — Server + Multiplayer (Nov 12–14, 3 days)
 

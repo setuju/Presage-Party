@@ -97,6 +97,7 @@ document.addEventListener('DOMContentLoaded', () => {
   let f_blinkCount = 0;
   let f_talkCount = 0;
   let f_rateCount = 0;
+  let videoErrorCount = 0;
   let r_cursor = 0;
 
   const distractions = [
@@ -200,8 +201,17 @@ document.addEventListener('DOMContentLoaded', () => {
   });
   challengeVideo.addEventListener('error', () => {
     if (currentLevel === 3 && activeMode === 'flinch') {
-      currentLevel = 2; gameContainer.classList.remove('level3-mode'); bgVideo.style.opacity = '0.2';
-      statusText.textContent = 'Video missing. Distractions active!';
+      videoErrorCount++;
+      if (videoErrorCount >= 3) {
+        currentLevel = 2;
+        gameContainer.classList.remove('level3-mode');
+        bgVideo.style.opacity = '0.2';
+        statusText.textContent = 'Video missing. Distractions active!';
+      } else {
+        setTimeout(() => {
+          if (currentLevel === 3 && activeMode === 'flinch') playRandomChallengeVideo();
+        }, 1000);
+      }
     }
   });
 
@@ -280,13 +290,13 @@ document.addEventListener('DOMContentLoaded', () => {
     timerEl.textContent = Math.ceil(timeLeft);
 
     // Deterministic Time-Based Triggers for Multiplayer
-    if (activeMode === 'flinch' && currentLevel > 1) {
-      const interval = (currentLevel === 2) ? 4000 : 5000;
+    // Level 3 relies on 'ended' event, not a timer.
+    if (activeMode === 'flinch' && (currentLevel === 2 || currentLevel === 4)) {
+      const interval = 4000;
       const triggerTick = Math.floor(elapsed / interval);
       if (triggerTick > f_lastTriggerTick) {
         f_lastTriggerTick = triggerTick;
         if (currentLevel === 2) triggerDistraction();
-        else if (currentLevel === 3) playRandomChallengeVideo();
         else if (currentLevel === 4) triggerJumpscare();
       }
     }

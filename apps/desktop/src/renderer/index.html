@@ -52,6 +52,9 @@
 
     .center { text-align: center; }
     .result-icon { font-size: 80px; margin-bottom: 20px; }
+    .debug-hud { position: absolute; bottom: 16px; right: 16px; z-index: 30;
+                 font-family: ui-monospace, monospace; font-size: 11px; color: #555;
+                 background: rgba(0,0,0,0.6); padding: 6px 10px; border-radius: 4px; }
   </style>
 </head>
 <body>
@@ -104,6 +107,7 @@
     <div class="timer" id="timer">30</div>
     <div class="status-text" id="status-text">Do not flinch.</div>
   </div>
+  <div class="debug-hud" id="debug-hud">blink: 0 | talk: 0 | rate: 0</div>
 </div>
 
 <!-- SCREEN: FLINCH RESULT -->

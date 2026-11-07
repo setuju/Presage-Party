@@ -63,3 +63,18 @@ cannot.
 ## License
 
 MIT for our code. SmartSpectra SDK is subject to Presage's terms.
+
+## Video Assets Credits
+
+Level 3 ("Why So Serious?") uses the following YouTube Shorts as distraction assets. Special thanks to the original creators:
+
+- https://www.youtube.com/shorts/ENYYKdgvmI0
+- https://www.youtube.com/shorts/TjGEfYBJrxE
+- https://www.youtube.com/shorts/yGgVbch7awY
+- https://www.youtube.com/shorts/EAsEsT4dTTw
+- https://www.youtube.com/shorts/OHc_ZH_pkhQ
+- https://www.youtube.com/shorts/_Nc_i7QuOP0
+- https://www.youtube.com/shorts/a3b-Ha9UIv0
+- https://www.youtube.com/shorts/5_54xuBh5_k
+
+*Note for players: To play Level 3 in multiplayer, both machines must have these videos downloaded to `apps/desktop/fixtures/distractions/`.*

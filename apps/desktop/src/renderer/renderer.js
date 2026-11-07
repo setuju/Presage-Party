@@ -541,6 +541,8 @@ document.addEventListener('DOMContentLoaded', () => {
     socket = io('http://127.0.0.1:3000');
 
     socket.on('connect', () => {
+      const info = document.getElementById('mp-server-info');
+      if(info) info.textContent = 'Connected to 127.0.0.1:3000';
       mpStatus.textContent = 'Connected to server!';
       mpStatus.style.color = '#4ade80';
       btnCreateRoom.disabled = false;
@@ -587,10 +589,40 @@ document.addEventListener('DOMContentLoaded', () => {
 
     socket.on('player_joined', (playerId) => {
       console.log('[socket] opponent joined:', playerId);
-      mpStatus.innerHTML = 'Opponent joined! <span style="color:#aaa;font-size:13px;">Ready to start</span>';
-      mpStatus.style.color = '#4ade80';
+      mpStatus.innerHTML = '<span style="color:#4ade80;">Opponent joined!</span> <span style="color:#aaa;font-size:13px;">(You are the Room Master)</span>';
       const startBtn = document.getElementById('btn-mp-start');
       if (startBtn) { startBtn.disabled = false; startBtn.style.display = 'inline-flex'; }
+      const lvlSel = document.getElementById('mp-level-selector');
+      if (lvlSel) lvlSel.style.display = 'block';
+    });
+
+    socket.on('room_joined', (data) => {
+      console.log('[socket] joined room', data);
+      myRoleInRoom = 'guest';
+      mpStatus.innerHTML = '<span style="color:#4ade80;">Joined room ' + data.code + '</span><br><span style="color:#aaa;font-size:13px;">(You are a Gamer. Waiting for Room Master to start...)</span>';
+      btnCreateRoom.disabled = true;
+      btnJoinRoom.disabled = true;
+    });
+
+    socket.on('host_migrated', (newHostId) => {
+      console.log('[socket] host migrated to', newHostId);
+      if (socket.id === newHostId) {
+        myRoleInRoom = 'host';
+        mpStatus.innerHTML = '<span style="color:#fbbf24;">Host left. You are now the Room Master.</span>';
+        const startBtn = document.getElementById('btn-mp-start');
+        if (startBtn) { startBtn.disabled = false; startBtn.style.display = 'inline-flex'; }
+        const lvlSel = document.getElementById('mp-level-selector');
+        if (lvlSel) lvlSel.style.display = 'block';
+      }
+    });
+
+    socket.on('opponent_left', () => {
+      console.log('[socket] opponent left');
+      mpStatus.innerHTML = '<span style="color:#ef4444;">Opponent left the room.</span> Waiting for a new player...';
+      const startBtn = document.getElementById('btn-mp-start');
+      if (startBtn) { startBtn.disabled = true; startBtn.style.display = 'none'; }
+      const lvlSel = document.getElementById('mp-level-selector');
+      if (lvlSel) lvlSel.style.display = 'none';
     });
   }
 
@@ -636,6 +668,7 @@ document.addEventListener('DOMContentLoaded', () => {
     _retryBtn.addEventListener('click', () => {
       console.log('[socket] retry clicked');
       if (socket) { try { socket.disconnect(); } catch (e) {} socket = null; }
+      document.getElementById('mp-level-selector').style.display = 'none';
       mpStatus.textContent = 'Reconnecting...';
       mpStatus.style.color = '#fbbf24';
       btnCreateRoom.disabled = true;
@@ -662,14 +695,25 @@ document.addEventListener('DOMContentLoaded', () => {
     show('mp-result');
   }
 
+  const _lvlSel = document.getElementById('select-mp-level');
+  if (_lvlSel) {
+    _lvlSel.addEventListener('change', (e) => {
+      const warn = document.getElementById('mp-asset-warning');
+      if (warn) warn.style.display = (e.target.value === '3') ? 'block' : 'none';
+    });
+  }
+
   const _startBtn = document.getElementById('btn-mp-start');
   if (_startBtn) {
     _startBtn.addEventListener('click', () => {
-      socket.emit('start_game', (res) => {
+      const level = parseInt(document.getElementById('select-mp-level').value, 10);
+      socket.emit('start_game', { level }, (res) => {
         console.log('[socket] start_game ack', res);
         if (res && res.success) {
           _startBtn.disabled = true;
           _startBtn.style.display = 'none';
+          const lvlSel = document.getElementById('mp-level-selector');
+          if (lvlSel) lvlSel.style.display = 'none';
           mpStatus.textContent = 'Waiting for countdown...';
           mpStatus.style.color = '#fbbf24';
         } else {

@@ -223,11 +223,25 @@
     <div id="mp-server-info" style="color: #666; font-size: 12px; margin-bottom: 16px; font-family: monospace;"></div>
 
     <div style="display: flex; flex-direction: column; gap: 16px; margin-top: 32px;">
-      <button id="btn-create-room" class="btn btn-primary" disabled>Create Room</button>
+      <input type="password" id="input-create-password" placeholder="Set Password (optional)" style="width: 100%; padding: 10px; border-radius: 8px; border: 1px solid #444; background: #111; color: #fff; font-size: 14px; margin-bottom: 8px;">
+      <button id="btn-create-room" class="btn btn-primary" disabled style="width: 100%;">Create Room</button>
       
+      <!-- Room List Lobby -->
+      <div style="background: #111; border: 1px solid #333; border-radius: 8px; padding: 12px; margin-bottom: 12px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+          <span style="color: #aaa; font-size: 14px;">Public Rooms</span>
+          <button id="btn-refresh-rooms" class="btn" style="margin: 0; padding: 4px 8px; font-size: 12px;">Refresh</button>
+        </div>
+        <div id="room-list" style="max-height: 150px; overflow-y: auto; text-align: left;">
+          <div style="color: #666; font-size: 13px; text-align: center;">No rooms available.</div>
+        </div>
+      </div>
+      
+      <!-- Manual Join (Private) -->
       <div style="display: flex; gap: 8px;">
-        <input type="text" id="input-room-code" placeholder="ENTER ROOM CODE" style="flex: 1; padding: 14px; border-radius: 8px; border: 1px solid #444; background: #111; color: #fff; font-size: 16px; text-transform: uppercase; text-align: center;" maxlength="4">
-        <button id="btn-join-room" class="btn btn-level2" disabled>Join</button>
+        <input type="text" id="input-room-code" placeholder="ROOM CODE" style="flex: 1; padding: 10px; border-radius: 8px; border: 1px solid #444; background: #111; color: #fff; font-size: 14px; text-align: center;" maxlength="4">
+        <input type="password" id="input-room-password" placeholder="PASSWORD" style="flex: 1; padding: 10px; border-radius: 8px; border: 1px solid #444; background: #111; color: #fff; font-size: 14px;">
+        <button id="btn-join-room" class="btn btn-level2" style="padding: 10px 16px;" disabled>Join</button>
       </div>
     </div>
 

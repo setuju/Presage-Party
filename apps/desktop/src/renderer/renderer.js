@@ -35,6 +35,9 @@ document.addEventListener('DOMContentLoaded', () => {
   const btnJoinRoom = document.getElementById('btn-join-room');
   const btnStartGame = document.getElementById('btn-mp-start');
   const inputRoomCode = document.getElementById('input-room-code');
+  const inputRoomPassword = document.getElementById('input-room-password');
+  const inputCreatePassword = document.getElementById('input-create-password');
+  const roomListEl = document.getElementById('room-list');
   const levelSelector = document.getElementById('mp-level-selector');
   const selectLevel = document.getElementById('select-mp-level');
   const assetWarning = document.getElementById('mp-asset-warning');
@@ -460,6 +463,10 @@ document.addEventListener('DOMContentLoaded', () => {
       showMultiplayerResult(mine, opp, mine && opp && mine.score > opp.score, mine && opp && mine.score === opp.score);
     });
 
+    socket.on('cheat_detected', (cheaterId) => {
+      if (cheaterId !== socket.id) { mpStatus.textContent = 'Opponent disqualified for minimizing window.'; mpStatus.style.color = '#ef4444'; }
+    });
+
     socket.on('host_migrated', (newHostId) => {
       if (socket.id === newHostId) {
         myRoleInRoom = 'host';
@@ -496,10 +503,11 @@ document.addEventListener('DOMContentLoaded', () => {
   if (retryBtn) retryBtn.addEventListener('click', () => { if (socket) { socket.disconnect(); socket = null; } mpStatus.textContent = 'Reconnecting...'; connectSocket(); });
 
   btnCreateRoom.addEventListener('click', () => {
-    socket.emit('create_room', (res) => {
+    const pwd = inputCreatePassword.value.trim();
+    socket.emit('create_room', { password: pwd }, (res) => {
       if (res.success) {
         myRoleInRoom = 'host';
-        mpStatus.innerHTML = `Room Code: <span style="font-size:32px; color:#fff;">${res.roomCode}</span><br><span style="font-size:14px; color:#aaa;">Waiting for opponent...</span>`;
+        mpStatus.innerHTML = `Room Code: <span style="font-size:32px; color:#fff;">${res.roomCode}</span>${pwd ? ' (Private)' : ''}<br><span style="font-size:14px; color:#aaa;">Waiting for opponent...</span>`;
         btnCreateRoom.disabled = true; btnJoinRoom.disabled = true;
       }
     });
@@ -507,11 +515,14 @@ document.addEventListener('DOMContentLoaded', () => {
 
   btnJoinRoom.addEventListener('click', () => {
     const code = inputRoomCode.value.trim().toUpperCase();
+    const pwd = inputRoomPassword.value.trim();
     if (!code) return;
-    socket.emit('join_room', code, (res) => {
+    socket.emit('join_room', { code, password: pwd }, (res) => {
       if (!res.success) { mpStatus.textContent = 'Error: ' + res.error; mpStatus.style.color = '#ef4444'; }
     });
   });
+
+  document.getElementById('btn-refresh-rooms').addEventListener('click', () => socket.emit('get_rooms'));
 
   if (selectLevel) {
     selectLevel.addEventListener('change', (e) => { assetWarning.style.display = (e.target.value === '3') ? 'block' : 'none'; });
@@ -544,6 +555,28 @@ document.addEventListener('DOMContentLoaded', () => {
 
   const waitingBack = document.getElementById('btn-mp-waiting-back');
   if (waitingBack) waitingBack.addEventListener('click', () => { myRoleInRoom = null; show('consent'); });
+
+  // Anti-Cheat: Detect window minimize / tab switch
+  document.addEventListener('visibilitychange', () => {
+    if (socket && socket.connected) {
+      socket.emit('visibility_change', document.visibilityState === 'visible');
+    }
+  });
+
+  // Handle cheat detection from server
+  socket.on('cheat_detected', (cheaterId) => {
+    if (cheaterId === socket.id) {
+      // I am the cheater
+      if (activeMode === 'flinch') {
+        f_composure = 0;
+        statusText.textContent = "DISQUALIFIED: Window minimized!";
+      }
+    } else {
+      // Opponent cheated
+      mpStatus.textContent = "Opponent disqualified for minimizing window.";
+      mpStatus.style.color = '#ef4444';
+    }
+  });
 
   show('consent');
 });

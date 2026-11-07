@@ -53,6 +53,22 @@ Full setup, testing, and troubleshooting: see [`INSTRUCTIONS.md`](./INSTRUCTIONS
 Live changelog: [`CHANGELOG.md`](./CHANGELOG.md).
 Roadmap: [`ROADMAP.md`](./ROADMAP.md).
 
+
+## Multiplayer Royale (New!)
+Play against a friend locally or over the network!
+- **Private & Public Rooms:** Create a room with an optional password.
+- **Synchronized Gameplay:** Both players face the exact same video sequence and jumpscares, guaranteed by deterministic room-code hashing.
+- **Anti-Cheat:** Minimizing the window during a match will result in instant disqualification.
+- **Host Migration:** If the host leaves, the guest is automatically promoted.
+
+## Installation (For Judges)
+1. Clone the repo.
+2. Run `pnpm install`.
+3. Since the SmartSpectra SDK is experimental on Windows (TPM issues), we use pre-recorded metrics.
+4. Run `pnpm dev` inside `apps/desktop`.
+
+*(For full instructions, see `HANDOFF.md`)*
+
 ## Disclaimer
 
 Presage Party is **not a medical device**. It does not diagnose, treat, monitor,

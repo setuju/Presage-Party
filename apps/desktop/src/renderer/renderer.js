@@ -646,8 +646,10 @@ document.addEventListener('DOMContentLoaded', () => {
     if (selectLevel) selectLevel.addEventListener('change', (e) => { 
       if (e.target.value === '3') {
         assetWarning.style.display = 'block';
-        if (!assetsReady) { alert('Level 3 is disabled because you are missing video assets.'); selectLevel.value = '1'; assetWarning.style.display = 'none'; }
-      } else { assetWarning.style.display = 'none'; }
+        // Blokir UI dihapus. Jika video gagal, fallback ke Level 2 akan bekerja.
+      } else { 
+        assetWarning.style.display = 'none'; 
+      }
     });
 
     if (btnStartGame) btnStartGame.addEventListener('click', () => {

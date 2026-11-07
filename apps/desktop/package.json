@@ -2,16 +2,19 @@
   "name": "@presage-party/desktop",
   "version": "0.0.0",
   "private": true,
-  "type": "module",
+  "type": "commonjs",
+  "main": "dist/main/index.js",
   "scripts": {
-    "spike": "tsx scripts/spike-file.mts",
-    "dev": "echo 'electron not wired yet — Phase 0b'"
+    "build": "tsc",
+    "dev": "pnpm build && electron .",
+    "spike": "tsx scripts/spike-file.mts"
   },
   "dependencies": {
     "@smartspectra/node-sdk": "*"
   },
   "devDependencies": {
-    "@types/node": "^22.20.5",
+    "@types/node": "^22.10.0",
+    "electron": "^42.11.16",
     "tsx": "^4.19.2",
     "typescript": "^5.7.2"
   }

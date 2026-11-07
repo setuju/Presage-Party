@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Presage Party — Phase 1b</title>
+  <style>
+    body { font-family: system-ui, sans-serif; background: #111; color: #eee; padding: 24px; margin: 0; }
+    h1 { font-weight: 500; letter-spacing: -0.02em; }
+    h2 { font-weight: 500; margin-top: 24px; }
+    .row { margin: 6px 0; font-size: 14px; }
+    .label { color: #888; display: inline-block; min-width: 140px; }
+    .value { color: #4ade80; }
+    .error { color: #f87171; }
+    pre { background: #1a1a1a; padding: 12px; border-radius: 6px; overflow: auto; max-height: 40vh; font-size: 12px; }
+  </style>
+</head>
+<body>
+  <h1>Presage Party — Phase 1b</h1>
+  <p style="color:#888">Electron shell loaded. Reading replay timeline via IPC.</p>
+  <div class="row"><span class="label">status</span><span id="status" class="value">loading...</span></div>
+  <div id="meta"></div>
+  <h2>Samples preview</h2>
+  <pre id="preview">(loading)</pre>
+  <script src="./renderer.js"></script>
+</body>
+</html>

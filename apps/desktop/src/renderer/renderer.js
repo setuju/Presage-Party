@@ -1,6 +1,17 @@
 'use strict';
 
 document.addEventListener('DOMContentLoaded', () => {
+  // Seeded PRNG (Mulberry32) for deterministic random events across clients
+  function mulberry32(a) {
+    return function() {
+      var t = a += 0x6D2B79F5;
+      t = Math.imul(t ^ t >>> 15, t | 1);
+      t ^= t + Math.imul(t ^ t >>> 7, t | 61);
+      return ((t ^ t >>> 14) >>> 0) / 4294967296;
+    }
+  }
+  let rng = Math.random; // Default to unseeded
+
   const screens = {
     consent: document.getElementById('screen-consent'),
     rules: document.getElementById('screen-rules'),
@@ -196,7 +207,7 @@ document.addEventListener('DOMContentLoaded', () => {
   function triggerDistraction() {
     if (activeMode !== 'flinch' || currentLevel !== 2) return;
 
-    const d = distractions[Math.floor(Math.random() * distractions.length)];
+    const d = distractions[Math.floor(rng() * distractions.length)];
     const el = document.createElement('div');
     el.className = 'distraction-text';
     el.textContent = d.text;
@@ -219,7 +230,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (activeMode !== 'flinch' || currentLevel !== 4) return;
 
     // Randomize face
-    jumpscareFace.textContent = scaryFaces[Math.floor(Math.random() * scaryFaces.length)];
+    jumpscareFace.textContent = scaryFaces[Math.floor(rng() * scaryFaces.length)];
     
     // Play audio
     playScream();
@@ -243,7 +254,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   function playRandomChallengeVideo() {
     if (currentLevel !== 3 || activeMode !== 'flinch' || challengeVideoUrls.length === 0) return;
-    const url = challengeVideoUrls[Math.floor(Math.random() * challengeVideoUrls.length)];
+    const url = challengeVideoUrls[Math.floor(rng() * challengeVideoUrls.length)];
     challengeVideo.src = url;
     challengeVideo.play().catch(e => {
       setTimeout(playRandomChallengeVideo, 1000);
@@ -565,6 +576,8 @@ document.addEventListener('DOMContentLoaded', () => {
       console.log('[socket] game_start', payload);
       const startAt = payload && payload.startAt;
       const level = (payload && payload.level) || 1;
+      const seed = payload && payload.seed;
+      if (seed !== undefined) rng = mulberry32(seed);
       const delay = Math.max(0, (startAt || Date.now()) - Date.now());
       mpStatus.textContent = 'Starting in ' + Math.ceil(delay / 1000) + '...';
       mpStatus.style.color = '#fbbf24';
@@ -741,9 +754,19 @@ document.addEventListener('DOMContentLoaded', () => {
     _rematchBtn.addEventListener('click', () => {
       show('multiplayer');
       const sb = document.getElementById('btn-mp-start');
-      if (sb && myRoleInRoom === 'host') { sb.disabled = false; sb.style.display = 'inline-flex'; }
-      mpStatus.textContent = 'Ready for rematch.';
-      mpStatus.style.color = '#4ade80';
+      const lvlSel = document.getElementById('mp-level-selector');
+      
+      if (myRoleInRoom === 'host') {
+        if (sb) { sb.disabled = false; sb.style.display = 'inline-flex'; }
+        if (lvlSel) { lvlSel.style.display = 'block'; } // Show level selector again
+        mpStatus.textContent = 'Select a level to start rematch.';
+        mpStatus.style.color = '#4ade80';
+      } else {
+        if (sb) { sb.disabled = true; sb.style.display = 'none'; }
+        if (lvlSel) { lvlSel.style.display = 'none'; }
+        mpStatus.textContent = 'Waiting for Room Master to start rematch...';
+        mpStatus.style.color = '#fbbf24';
+      }
     });
   }
 

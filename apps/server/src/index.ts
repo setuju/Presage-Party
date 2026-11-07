@@ -57,8 +57,9 @@ io.on('connection', (socket) => {
 
       room.level = (data && data.level) || 1;
       room.startAt = Date.now() + 3000;
+      const seed = Math.floor(Math.random() * 1000000); // NEW: Random seed
       room.results = { host: null, guest: null };
-      io.to(code).emit('game_start', { startAt: room.startAt, level: room.level });
+      io.to(code).emit('game_start', { startAt: room.startAt, level: room.level, seed });
       console.log(`[game] room ${code} starting at ${room.startAt} level ${room.level}`);
       if (typeof callback === 'function') callback({ success: true });
     } catch (e) { console.error(e); if (typeof callback === 'function') callback({ success: false }); }

@@ -461,6 +461,20 @@ document.addEventListener('DOMContentLoaded', () => {
       });
     });
 
+    socket.on('room_created', (data) => {
+      console.log('[socket] room_created:', data);
+      myRoleInRoom = 'host';
+      // UI yang lebih bagus untuk menampilkan kode room
+      mpStatus.innerHTML = `
+        <div style="background:#1a1a1a; border:2px solid #4ade80; border-radius:12px; padding:20px; margin-bottom:16px;">
+          <div style="color:#aaa; font-size:14px; margin-bottom:8px;">Room Code</div>
+          <div style="font-size:48px; font-weight:900; color:#fff; letter-spacing:8px; margin-bottom:12px;">${data.roomCode}</div>
+          <button onclick="navigator.clipboard.writeText('${data.roomCode}'); alert('Code copied!')" class="btn" style="margin:0; padding:8px 16px; font-size:14px;">Copy Code</button>
+        </div>
+        <div style="color:#4ade80; font-weight:bold;">Waiting for opponent to join...</div>
+      `;
+    });
+
     socket.on('room_joined', (data) => {
       myRoleInRoom = 'guest';
       mpStatus.innerHTML = `<span style="color:#4ade80;">Joined ${data.hostName}'s room</span><br><span style="color:#aaa;font-size:13px;">(Waiting for host to start...)</span>`;
@@ -587,24 +601,13 @@ document.addEventListener('DOMContentLoaded', () => {
         return;
       }
       
-      // Disable instantly to prevent spam
       btnCreateRoom.disabled = true; 
       btnJoinRoom.disabled = true;
+      mpStatus.textContent = 'Creating room...';
+      mpStatus.style.color = '#fbbf24';
       
       const pwd = inputCreatePassword.value.trim();
-      socket.emit('create_room', { password: pwd, name: myUsername }, (res) => {
-        console.log('[socket] create_room ack:', res);
-        if (res.success) {
-          myRoleInRoom = 'host';
-          mpStatus.innerHTML = `Room Code: <span style="font-size:32px; color:#fff;">${res.roomCode}</span>${pwd ? ' (Private)' : ''}<br><span style="font-size:14px; color:#aaa;">Waiting for opponent...</span>`;
-        } else {
-          // Re-enable on failure
-          btnCreateRoom.disabled = false; 
-          btnJoinRoom.disabled = false;
-          mpStatus.textContent = 'Error: ' + (res.error || 'Unknown error');
-          mpStatus.style.color = '#ef4444';
-        }
-      });
+      socket.emit('create_room', { password: pwd, name: myUsername });
     });
 
     btnJoinRoom.addEventListener('click', () => {

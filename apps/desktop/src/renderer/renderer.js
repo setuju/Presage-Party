@@ -418,6 +418,11 @@ document.addEventListener('DOMContentLoaded', () => {
     alertFlinch.classList.add('pop');
   }
 
+  function computeFinalScore() {
+    // score = composure_remaining * 10. Max 1000 at 100% composure.
+    return Math.max(0, Math.round(f_composure * 10));
+  }
+
   function endFlinch(survived) {
     activeMode = 'none';
     cancelAnimationFrame(rafId);
@@ -430,17 +435,22 @@ document.addEventListener('DOMContentLoaded', () => {
     challengeVideo.removeAttribute('src');
     jumpscareOverlay.classList.remove('active');
 
+    const score = survived ? computeFinalScore() : 0;
+
     document.getElementById('result-icon').textContent = survived ? '🏆' : '💀';
     document.getElementById('result-title').textContent = survived ? 'You survived!' : 'Eliminated';
+    document.getElementById('result-score-value').textContent = score;
     
     let modeText = '';
-    if (currentLevel === 2) modeText = ' (Seriously?)';
-    if (currentLevel === 3) modeText = ' (Why So Serious?)';
-    if (currentLevel === 4) modeText = ' (Don\'t Scream)';
+    if (currentLevel === 2) modeText = 'Seriously?';
+    if (currentLevel === 3) modeText = 'Why So Serious?';
+    if (currentLevel === 4) modeText = 'Don\'t Scream';
+    if (currentLevel === 1) modeText = 'Chill Mode';
+    document.getElementById('result-level').textContent = modeText;
     
     const desc = survived
-      ? `Composure: ${Math.round(f_composure)}% · blinks: ${f_blinkCount} · rate: ${f_rateCount}${modeText}`
-      : `Final composure: 0% · blinks: ${f_blinkCount} · talks: ${f_talkCount} · rate: ${f_rateCount}${modeText}`;
+      ? `Composure: ${Math.round(f_composure)}% · blinks: ${f_blinkCount} · talks: ${f_talkCount} · rate spikes: ${f_rateCount}`
+      : `Eliminated at 0% composure · blinks: ${f_blinkCount} · talks: ${f_talkCount} · rate spikes: ${f_rateCount}`;
     document.getElementById('result-desc').textContent = desc;
 
     if (currentLevel > 1) revealMessage.style.display = 'block';

@@ -1,58 +1,17 @@
 # Security & Threat Model — Presage Party
 
-## Trust boundaries
+## Threat Addressed: Anti-Cheat (Minimize Detection)
+- **Issue:** Players can minimize the game to avoid watching scary videos (Level 3/4).
+- **Solution:** Renderer listens to `document.visibilitychange`. If hidden, it emits `visibility_change(false)` to the server.
+- **Enforcement:** Server starts a `setInterval` and emits `cheat_penalty(10)` every 3 seconds while hidden. Client subtracts 10 composure. (Note: In the future, the server itself should calculate composure to prevent JS tampering).
 
-```
-+-------------------------+         +-------------------+
-¦  Electron main process  ¦         ¦  Socket.IO server ¦
-¦  - Camera               ¦         ¦  - Rooms          ¦
-¦  - SmartSpectra SDK     ¦ metrics ¦  - Sessions       ¦
-¦  - sdk-bridge           +--------?¦  - Scoring        ¦
-¦  - Ed25519 signing      ¦  signed ¦  - In-memory only ¦
-+-------------------------+         +-------------------+
-            ¦ IPC (limited)
-+-----------?-------------+
-¦  Renderer (React/Phaser)¦
-¦  - Game UI              ¦
-¦  - No camera access     ¦
-+-------------------------+
-```
+## Threat Addressed: Replay/Injection
+- **Issue:** A malicious client spoofs `report_score`.
+- **Solution (Planned):** Move the Socket.IO server to a public host (Render) and enforce authoritative scoring (server runs the game loop timer and validates metrics). Currently, scores are client-reported.
 
-- **Client cannot be trusted** to report its own score.
-- **Server cannot verify** that a signal is physiologically real without
-  video — which we refuse to collect. This is a **documented trade-off**,
-  not an oversight.
-
-## Threats addressed
-
-| # | Threat | Defense |
-|---|---|---|
-| T1 | Casual fabrication | Server-authoritative scoring + plausibility bounds |
-| T2 | Replay | Per-round nonce + Ed25519 signature |
-| T3 | Packet injection | Signature verify before state commit |
-| T4 | MitM | WSS/TLS + Electron = 42.11.16 + optional cert pinning |
-| T5 | DoS via expensive verify | Rate limit **before** signature verify |
-| T6 | Collusion / alt accounts | Social (local party) + presence indicator; documented as out of technical scope |
-| T7 | Perfect-play bot | Shadow flag on zero-noise + high-quality streams; **flag, not kick** |
-| T8 | XSS via name | `sanitizeName()` on server |
-
-## Threats explicitly out of scope
-
-- Determining whether a *sophisticated* attacker is simulating human
-  physiology. If the statistical profile matches a human, we cannot tell.
-- Collusion between two cooperating humans. Money cannot be verified as
-  earned.
-
-## Privacy guarantees (enforced in code)
-
-- Camera access only in `src/main/`
-- `sdk-bridge` never logs raw samples
-- No video, frames, or images cross the IPC boundary
-- No biometric data written to disk or database
-- SDK telemetry disabled (`enableTelemetry = false`)
-- Server uses `Map<>` only; process exit wipes state
-
-## Reporting
-
-If you find a security issue, email the maintainer, do not open a public
-issue.
+## Privacy Guarantees
+- Camera access only in `src/renderer/`.
+- `sdk-bridge` never logs raw samples.
+- No video, frames, or images cross the IPC boundary.
+- No biometric data written to disk or database.
+- SDK telemetry disabled (`enableTelemetry = false`).

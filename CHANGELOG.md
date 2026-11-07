@@ -22,6 +22,35 @@ This project does not follow strict SemVer — it is a hackathon submission.
 
 ---
 
+## [0.1.0] — 2026-11-07 — Phase 0 COMPLETE
+
+### Added
+- Headless `useFile()` spike harness in pure Node 24 (no Electron required)
+- `apps/desktop/.env.example` for SMARTSPECTRA_API_KEY
+- `apps/desktop/scripts/spike-file.mts` — reads video, emits metrics + accumulatedMetrics
+- 30fps CFR fixture generation (face30.mp4, ~16 MB, 73 s)
+
+### Changed
+- `interframeDelayMs` defaults to 33 to match 30fps CFR playback
+- `requestedMetrics` explicit (`breathingMetrics + faceMetrics`), not SDK default
+- `enableAccumulatedOutput: true` — required to receive derived rate metrics
+
+### Fixed
+- Non-monotonic timestamps: 743 -> 0 by re-encoding video to 30fps CFR
+- Spike distinguishes kError vs wall-clock timeout (was reporting both as TIMEOUT)
+- EOF detection polls `sdk.processingStatus` via `setImmediate` (SDK does not
+  reliably emit kRunning/kIdle through the `processingStatus` event for file playback)
+
+### Security
+- All spike runs use `enableTelemetry: false`
+- `apps/desktop/.env` gitignored; only `.env.example` committed
+- `apps/desktop/fixtures/` gitignored (no face video in history)
+
+### Documentation
+- `ROADMAP.md`: Phase 0 marked complete with findings
+- `DEV_NOTES.md`: session 3 entry with full empirical SDK surface
+- This entry
+
 ## [0.0.1] — 2026-11-05
 
 ### Added

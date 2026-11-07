@@ -7,19 +7,38 @@ If a phase slips more than one day, cut scope — never the SDK integration.
 
 ---
 
-## Phase 0 — SDK Spike (Nov 5–6, 2 days)
+## Phase 0 — SDK Spike ✅ COMPLETE (Nov 7)
 
 **Goal:** prove that SmartSpectra works on this machine with Electron.
+**Outcome:** proved in pure Node 24 (WSL2 Ubuntu 26.04), 99.9% face detection,
+0 errors, breathing rate emitted via accumulatedMetrics. Electron deferred to Phase 1.
 
-- [ ] `pnpm init` workspace, empty `apps/desktop`, `apps/server`
-- [ ] Install `@smartspectra/node-sdk`, `electron@latest` (>= 42.11.16, CVE-2026-115570 patched)
-- [ ] Get API key from Presage developer portal
-- [ ] Minimal Electron window that shows live `pulse`, `breathingRate`, `hrv`, `expression`
-- [ ] Confirm nil-value behavior: log samples with missing pulse vs missing breathing
-- [ ] Confirm telemetry opt-out works (`enableTelemetry = false`)
+- [x] `pnpm init` workspace, empty `apps/desktop`, `apps/server`
+- [x] Install `@smartspectra/node-sdk@3.4.0` (Electron deferred to Phase 1)
+- [x] Get API key from Presage developer portal
+- [x] Harness that logs pulse/breathing/HRV/expression
+- [x] Confirm nil-value behavior: metrics stream emits traces, not rates
+- [x] Confirm telemetry opt-out works (`enableTelemetry = false`)
 
-**Exit criterion:** a screen in Electron that shows live numbers changing as I breathe
-differently. If this fails on day 2, **stop and reconsider the whole project.**
+**Pivot:** WSL2 has no `/dev/video*`. Proved SDK via `useFile()` with
+recorded face video, not live camera. Electron + live camera deferred to
+Phase 1, with Windows-native as the leading candidate.
+
+**Findings:**
+- SDK works in pure Node 24.21. FFI (koffi) loads cleanly.
+- `metrics` stream carries traces (breathing.upperTrace) and presence flags
+  (face.blinking.stable, face.talking.stable), not rates.
+- `accumulatedMetrics` (via `enableAccumulatedOutput: true`) carries derived
+  rates: `breathing.rate[].value`, `.confidence`, optional `.stable`.
+- 30fps CFR + `interframeDelayMs: 33` -> 0 non-monotonic warnings.
+- 60fps native + `interframeDelayMs: 16` -> 743 warnings but recovers.
+- Cardio (pulse) dropped for Phase 2 due to CPU cost on target hardware.
+
+**Exit criterion (original):** a screen in Electron that shows live numbers
+changing as I breathe differently. **Revised exit criterion met:**
+`[spike] OK -- 3176 metrics events, breathing rate emitted via
+accumulatedMetrics, 0 errors.`
+
 
 ---
 

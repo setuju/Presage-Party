@@ -1,5 +1,23 @@
 'use strict';
 
+// GLOBAL SHARE FUNCTION
+window.shareResult = function(platform, score) {
+  const url = 'https://github.com/setuju/Presage-Party';
+  const text = `I just ${score ? 'scored ' + score + ' in' : 'played'} Flinch Royale! Can you beat me? Play now:`;
+  let shareUrl = '';
+  
+  if (platform === 'whatsapp') shareUrl = `https://wa.me/?text=${encodeURIComponent(text + ' ' + url)}`;
+  else if (platform === 'telegram') shareUrl = `https://t.me/share/url?url=${encodeURIComponent(url)}&text=${encodeURIComponent(text)}`;
+  else if (platform === 'twitter') shareUrl = `https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}&url=${encodeURIComponent(url)}`;
+  else if (platform === 'instagram' || platform === 'tiktok') {
+    navigator.clipboard.writeText(text + ' ' + url);
+    alert('Link copied to clipboard! Open Instagram/TikTok and paste it in your story.');
+    return;
+  }
+  
+  window.open(shareUrl, '_blank');
+};
+
 document.addEventListener('DOMContentLoaded', () => {
   const screens = {
     name: document.getElementById('screen-name'),
@@ -18,7 +36,6 @@ document.addEventListener('DOMContentLoaded', () => {
   const challengeVideo = document.getElementById('challenge-video');
   const gameContainer = document.getElementById('game-container');
   
-  // UI Elements
   const composureBar = document.getElementById('composure-bar');
   const composureLabel = document.getElementById('composure-label');
   const timerEl = document.getElementById('timer');
@@ -30,7 +47,6 @@ document.addEventListener('DOMContentLoaded', () => {
   const jumpscareOverlay = document.getElementById('jumpscare-overlay');
   const jumpscareFace = document.getElementById('jumpscare-face');
   
-  // Multiplayer UI Elements
   const mpStatus = document.getElementById('mp-status');
   const btnCreateRoom = document.getElementById('btn-create-room');
   const btnJoinRoom = document.getElementById('btn-join-room');
@@ -43,13 +59,13 @@ document.addEventListener('DOMContentLoaded', () => {
   const selectLevel = document.getElementById('select-mp-level');
   const assetWarning = document.getElementById('mp-asset-warning');
   const mpServerInfo = document.getElementById('mp-server-info');
+  const assetStatus = document.getElementById('asset-status');
 
   const mBr = document.getElementById('m-br');
   const mRate = document.getElementById('m-rate');
   const mBlink = document.getElementById('m-blink');
   const mTalk = document.getElementById('m-talk');
 
-  // State
   let timeline = null;
   let videoUrl = null;
   let rafId = 0;
@@ -58,9 +74,9 @@ document.addEventListener('DOMContentLoaded', () => {
   let currentOnFinish = null;
   let myRoleInRoom = null;
   let socket = null;
-  let myUsername = '';
+  let myUsername = 'Player';
+  let assetsReady = false;
 
-  // Deterministic RNG for Multiplayer
   let currentRng = Math.random;
   function mulberry32(a) {
     return function() {
@@ -77,8 +93,6 @@ document.addEventListener('DOMContentLoaded', () => {
     return Math.abs(hash);
   }
 
-  // Tunables & State
-  let f_durationMs = 30000;
   const F_PENALTY_BLINK = 4;
   const F_PENALTY_BLINK_JUMP = 15;
   const BLINK_COOLDOWN_MS = 2000;
@@ -89,6 +103,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const F_RATE_PENALTY_TICK = 1000;
   const F_RATE_PENALTY = 1;
 
+  let f_durationMs = 30000;
   let f_composure = 100;
   let f_startTime = 0;
   let f_lastFrameTime = 0;
@@ -102,8 +117,12 @@ document.addEventListener('DOMContentLoaded', () => {
   let f_blinkCount = 0;
   let f_talkCount = 0;
   let f_rateCount = 0;
-  let videoErrorCount = 0;
   let r_cursor = 0;
+  let videoErrorCount = 0;
+
+  let audioCtx = null;
+  let distractionTimeout = null;
+  let jumpscareTimeout = null;
 
   const distractions = [
     { type: 'speech', text: 'Is that a pimple on your nose?', lang: 'en-US' },
@@ -120,10 +139,6 @@ document.addEventListener('DOMContentLoaded', () => {
   const challengeVideoUrls = [];
   for (let i = 1; i <= 8; i++) challengeVideoUrls.push(`presage://local/distractions/distraction_${i}.mp4`);
   const scaryFaces = ['😱', '👹', '💀', '👻', '😈'];
-
-  let audioCtx = null;
-  let distractionTimeout = null;
-  let jumpscareTimeout = null;
 
   function initAudio() {
     if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
@@ -208,14 +223,10 @@ document.addEventListener('DOMContentLoaded', () => {
     if (currentLevel === 3 && activeMode === 'flinch') {
       videoErrorCount++;
       if (videoErrorCount >= 3) {
-        currentLevel = 2;
-        gameContainer.classList.remove('level3-mode');
-        bgVideo.style.opacity = '0.2';
+        currentLevel = 2; gameContainer.classList.remove('level3-mode'); bgVideo.style.opacity = '0.2';
         statusText.textContent = 'Video missing. Distractions active!';
       } else {
-        setTimeout(() => {
-          if (currentLevel === 3 && activeMode === 'flinch') playRandomChallengeVideo();
-        }, 1000);
+        setTimeout(() => { if (currentLevel === 3 && activeMode === 'flinch') playRandomChallengeVideo(); }, 1000);
       }
     }
   });
@@ -223,7 +234,7 @@ document.addEventListener('DOMContentLoaded', () => {
   function show(name) {
     Object.keys(screens).forEach(k => {
       const el = screens[k];
-      if (el) el.classList.toggle('active', k === name); // Cek null
+      if (el) el.classList.toggle('active', k === name);
     });
   }
 
@@ -264,6 +275,7 @@ document.addEventListener('DOMContentLoaded', () => {
     clearTimeout(distractionTimeout); clearTimeout(jumpscareTimeout);
     jumpscareOverlay.classList.remove('active');
     isPostJumpscare = false; revealMessage.style.display = 'none';
+    videoErrorCount = 0;
 
     gameContainer.classList.remove('level3-mode');
     challengeVideo.pause(); challengeVideo.removeAttribute('src');
@@ -279,8 +291,6 @@ document.addEventListener('DOMContentLoaded', () => {
     f_composure = 100; f_startTime = performance.now(); f_lastFrameTime = f_startTime;
     f_lastBlinkState = false; f_lastBlinkPenaltyTime = -Infinity; f_talkAccumMs = 0; f_lastTalkPenaltyTime = -Infinity; f_lastRatePenaltyTime = -Infinity; f_lastTriggerTick = -1;
     f_blinkCount = 0; f_talkCount = 0; f_rateCount = 0;
-
-    updateFlinchUI(); updateDebugHud();
 
     if (level !== 3) { bgVideo.currentTime = 0; bgVideo.play().catch(e => console.error(e)); }
     cancelAnimationFrame(rafId); rafId = requestAnimationFrame(flinchLoop);
@@ -298,8 +308,6 @@ document.addEventListener('DOMContentLoaded', () => {
     if (elapsed >= f_durationMs) { endFlinch(true); return; }
     timerEl.textContent = Math.ceil(timeLeft);
 
-    // Deterministic Time-Based Triggers for Multiplayer
-    // Level 3 relies on 'ended' event, not a timer.
     if (activeMode === 'flinch' && (currentLevel === 2 || currentLevel === 4)) {
       const interval = 4000;
       const triggerTick = Math.floor(elapsed / interval);
@@ -409,23 +417,24 @@ document.addEventListener('DOMContentLoaded', () => {
     rafId = requestAnimationFrame(replayLoop);
   }
 
-  function showMultiplayerResult(mine, opp, iWon, isTie) {
+  function showMultiplayerResult(mine, opp, iWon, isTie, payload) {
     const title = isTie ? "IT'S A TIE" : (iWon ? 'YOU WIN' : 'YOU LOSE');
     const color = isTie ? '#fbbf24' : (iWon ? '#4ade80' : '#ef4444');
     const tEl = document.getElementById('mp-result-title'); if (tEl) { tEl.textContent = title; tEl.style.color = color; }
     
-    // Tampilkan nama asli
     const mineLabel = myRoleInRoom === 'host' ? payload.hostName : payload.guestName;
     const oppLabel = myRoleInRoom === 'host' ? payload.guestName : payload.hostName;
-    document.querySelector('#mp-result-mine').previousElementSibling.textContent = `${mineLabel} (You)`;
-    document.querySelector('#mp-result-opp').previousElementSibling.textContent = oppLabel;
+    const mineEl = document.getElementById('mp-result-mine');
+    const oppEl = document.getElementById('mp-result-opp');
+    if (mineEl && mineEl.previousElementSibling) mineEl.previousElementSibling.textContent = `${mineLabel} (You)`;
+    if (oppEl && oppEl.previousElementSibling) oppEl.previousElementSibling.textContent = oppLabel;
 
     if (mine) { document.getElementById('mp-result-mine').textContent = mine.score; document.getElementById('mp-result-mine-stats').textContent = `blinks ${mine.blinks} · talks ${mine.talks} · rate ${mine.rateSpikes}`; }
     if (opp) { document.getElementById('mp-result-opp').textContent = opp.score; document.getElementById('mp-result-opp-stats').textContent = `blinks ${opp.blinks} · talks ${opp.talks} · rate ${opp.rateSpikes}`; }
     show('mp-result');
   }
 
-  // MULTIPLAYER NETWORKING
+  // SOCKET LOGIC
   function connectSocket() {
     if (socket) return;
     socket = io('http://127.0.0.1:3000', { transports: ['websocket', 'polling'], timeout: 5000, reconnectionAttempts: 3 });
@@ -434,6 +443,8 @@ document.addEventListener('DOMContentLoaded', () => {
       if(mpServerInfo) mpServerInfo.textContent = 'Connected to 127.0.0.1:3000';
       mpStatus.textContent = 'Connected!'; mpStatus.style.color = '#4ade80';
       btnCreateRoom.disabled = false; btnJoinRoom.disabled = false;
+      if (assetsReady) socket.emit('assets_ready');
+      socket.emit('get_rooms');
     });
     
     socket.on('connect_error', (err) => {
@@ -442,6 +453,14 @@ document.addEventListener('DOMContentLoaded', () => {
       btnCreateRoom.disabled = true; btnJoinRoom.disabled = true;
     });
     
+    socket.on('rooms_list', (rooms) => {
+      if (rooms.length === 0) { roomListEl.innerHTML = '<div style="color: #666; font-size: 13px; text-align: center;">No rooms available.</div>'; return; }
+      roomListEl.innerHTML = rooms.map(r => `<div style="display: flex; justify-content: space-between; padding: 8px; border-bottom: 1px solid #222;"><span style="font-family: monospace; font-size: 16px; color: #fff;">${r.code}</span><button class="btn btn-level2 btn-join-lobby" data-code="${r.code}" style="margin:0; padding:4px 12px; font-size:12px;">Join</button></div>`).join('');
+      document.querySelectorAll('.btn-join-lobby').forEach(btn => {
+        btn.addEventListener('click', (e) => { const code = e.target.getAttribute('data-code'); inputRoomCode.value = code; inputRoomPassword.value = ''; btnJoinRoom.click(); });
+      });
+    });
+
     socket.on('room_joined', (data) => {
       myRoleInRoom = 'guest';
       mpStatus.innerHTML = `<span style="color:#4ade80;">Joined ${data.hostName}'s room</span><br><span style="color:#aaa;font-size:13px;">(Waiting for host to start...)</span>`;
@@ -457,26 +476,15 @@ document.addEventListener('DOMContentLoaded', () => {
     socket.on('game_start', (payload) => {
       const delay = Math.max(0, (payload.startAt || Date.now()) - Date.now());
       if (payload.roomCode) currentRng = mulberry32(hashRoomCode(payload.roomCode));
-      f_durationMs = (payload.duration || 30) * 1000;
       mpStatus.textContent = 'Starting in ' + Math.ceil(delay / 1000) + '...';
       mpStatus.style.color = '#fbbf24';
-      
-      setTimeout(() => {
-        startFlinch(payload.level, payload.duration || 30, (scoreData) => {
-          socket.emit('report_score', scoreData);
-          show('mp-waiting');
-        });
-      }, delay);
+      setTimeout(() => { startFlinch(payload.level, payload.duration || 30, (scoreData) => { socket.emit('report_score', scoreData); show('mp-waiting'); }); }, delay);
     });
 
     socket.on('game_result', (payload) => {
       const mine = myRoleInRoom === 'host' ? payload.host : payload.guest;
       const opp  = myRoleInRoom === 'host' ? payload.guest : payload.host;
-      showMultiplayerResult(mine, opp, mine && opp && mine.score > opp.score, mine && opp && mine.score === opp.score);
-    });
-
-    socket.on('cheat_detected', (cheaterId) => {
-      if (cheaterId !== socket.id) { mpStatus.textContent = 'Opponent disqualified for minimizing window.'; mpStatus.style.color = '#ef4444'; }
+      showMultiplayerResult(mine, opp, mine && opp && mine.score > opp.score, mine && opp && mine.score === opp.score, payload);
     });
 
     socket.on('host_migrated', (newHostId) => {
@@ -493,120 +501,113 @@ document.addEventListener('DOMContentLoaded', () => {
       if (btnStartGame) { btnStartGame.disabled = true; btnStartGame.style.display = 'none'; }
       if (levelSelector) levelSelector.style.display = 'none';
     });
-  }
 
-  // BUTTON LISTENERS
-  document.getElementById('btn-level1').addEventListener('click', () => startFlinch(1, parseInt(document.getElementById('select-solo-duration').value, 10)));
-  document.getElementById('btn-level2').addEventListener('click', () => startFlinch(2, parseInt(document.getElementById('select-solo-duration').value, 10)));
-  document.getElementById('btn-level3').addEventListener('click', () => startFlinch(3, parseInt(document.getElementById('select-solo-duration').value, 10)));
-  document.getElementById('btn-level4').addEventListener('click', () => startFlinch(4, parseInt(document.getElementById('select-solo-duration').value, 10)));
-  document.getElementById('btn-replay').addEventListener('click', startReplay);
-  document.getElementById('btn-flinch-restart').addEventListener('click', () => startFlinch(currentLevel, f_durationMs / 1000));
-  document.getElementById('btn-back').addEventListener('click', () => show('consent'));
-  document.getElementById('btn-rules').addEventListener('click', () => show('rules'));
-  document.getElementById('btn-rules-back').addEventListener('click', () => show('consent'));
-  document.getElementById('btn-rules-back-top').addEventListener('click', () => show('consent'));
-  document.getElementById('btn-back-player').addEventListener('click', () => { activeMode = 'none'; video.pause(); show('consent'); });
-
-  document.getElementById('btn-multiplayer').addEventListener('click', () => { show('multiplayer'); connectSocket(); });
-  document.getElementById('btn-mp-back').addEventListener('click', () => show('consent'));
-  
-  const retryBtn = document.getElementById('btn-mp-retry');
-  if (retryBtn) retryBtn.addEventListener('click', () => { if (socket) { socket.disconnect(); socket = null; } mpStatus.textContent = 'Reconnecting...'; connectSocket(); });
-
-  btnCreateRoom.addEventListener('click', () => {
-    const pwd = inputCreatePassword.value.trim();
-    socket.emit('create_room', { password: pwd, name: myUsername }, (res) => {
-      if (res.success) {
-        myRoleInRoom = 'host';
-        mpStatus.innerHTML = `Room Code: <span style="font-size:32px; color:#fff;">${res.roomCode}</span>${pwd ? ' (Private)' : ''}<br><span style="font-size:14px; color:#aaa;">Waiting for opponent...</span>`;
-        btnCreateRoom.disabled = true; btnJoinRoom.disabled = true;
+    socket.on('cheat_detected', (cheaterId) => {
+      if (cheaterId === socket.id) {
+        if (activeMode === 'flinch') { f_composure = 0; statusText.textContent = "DISQUALIFIED: Window minimized!"; }
+      } else {
+        mpStatus.textContent = "Opponent disqualified for minimizing window."; mpStatus.style.color = '#ef4444';
       }
     });
-  });
-
-  btnJoinRoom.addEventListener('click', () => {
-    const code = inputRoomCode.value.trim().toUpperCase();
-    const pwd = inputRoomPassword.value.trim();
-    if (!code) return;
-    socket.emit('join_room', { code, password: pwd, name: myUsername }, (res) => {
-      if (!res.success) { mpStatus.textContent = 'Error: ' + res.error; mpStatus.style.color = '#ef4444'; }
-    });
-  });
-
-  document.getElementById('btn-refresh-rooms').addEventListener('click', () => socket.emit('get_rooms'));
-
-  if (selectLevel) {
-    selectLevel.addEventListener('change', (e) => { assetWarning.style.display = (e.target.value === '3') ? 'block' : 'none'; });
   }
 
-  if (btnStartGame) {
-    btnStartGame.addEventListener('click', () => {
+  // INIT
+  async function initApp() {
+    const res = await window.presage.checkAssets();
+    if (res.ready) {
+      assetsReady = true;
+      assetStatus.textContent = '✓ Game materials ready.';
+      assetStatus.style.color = '#4ade80';
+      if (socket && socket.connected) socket.emit('assets_ready');
+    } else {
+      assetsReady = false;
+      assetStatus.textContent = `Missing ${res.missing} video(s). Level 3 is disabled until you pull the full repository.`;
+      assetStatus.style.color = '#fbbf24';
+    }
+
+    document.getElementById('btn-save-name').addEventListener('click', () => {
+      const name = document.getElementById('input-username').value.trim();
+      if (!name) { alert('Please enter a name'); return; }
+      myUsername = name;
+      show('consent');
+    });
+
+    document.getElementById('btn-level1').addEventListener('click', () => startFlinch(1, parseInt(document.getElementById('select-solo-duration').value, 10)));
+    document.getElementById('btn-level2').addEventListener('click', () => startFlinch(2, parseInt(document.getElementById('select-solo-duration').value, 10)));
+    document.getElementById('btn-level3').addEventListener('click', () => startFlinch(3, parseInt(document.getElementById('select-solo-duration').value, 10)));
+    document.getElementById('btn-level4').addEventListener('click', () => startFlinch(4, parseInt(document.getElementById('select-solo-duration').value, 10)));
+    document.getElementById('btn-replay').addEventListener('click', startReplay);
+    document.getElementById('btn-flinch-restart').addEventListener('click', () => startFlinch(currentLevel, f_durationMs / 1000));
+    document.getElementById('btn-back').addEventListener('click', () => show('consent'));
+    
+    document.getElementById('btn-rules').addEventListener('click', () => show('rules'));
+    document.getElementById('btn-rules-back').addEventListener('click', () => show('consent'));
+    document.getElementById('btn-rules-back-top').addEventListener('click', () => show('consent'));
+    
+    document.getElementById('btn-back-player').addEventListener('click', () => { activeMode = 'none'; video.pause(); show('consent'); });
+
+    document.getElementById('btn-multiplayer').addEventListener('click', () => { show('multiplayer'); connectSocket(); });
+    document.getElementById('btn-mp-back').addEventListener('click', () => show('consent'));
+    document.getElementById('btn-refresh-rooms').addEventListener('click', () => { if (socket) socket.emit('get_rooms'); });
+
+    const retryBtn = document.getElementById('btn-mp-retry');
+    if (retryBtn) retryBtn.addEventListener('click', () => { if (socket) { socket.disconnect(); socket = null; } mpStatus.textContent = 'Reconnecting...'; connectSocket(); });
+
+    btnCreateRoom.addEventListener('click', () => {
+      const pwd = inputCreatePassword.value.trim();
+      socket.emit('create_room', { password: pwd, name: myUsername }, (res) => {
+        if (res.success) {
+          myRoleInRoom = 'host';
+          mpStatus.innerHTML = `Room Code: <span style="font-size:32px; color:#fff;">${res.roomCode}</span>${pwd ? ' (Private)' : ''}<br><span style="font-size:14px; color:#aaa;">Waiting for opponent...</span>`;
+          btnCreateRoom.disabled = true; btnJoinRoom.disabled = true;
+        }
+      });
+    });
+
+    btnJoinRoom.addEventListener('click', () => {
+      const code = inputRoomCode.value.trim().toUpperCase();
+      const pwd = inputRoomPassword.value.trim();
+      if (!code) return;
+      socket.emit('join_room', { code, password: pwd, name: myUsername }, (res) => {
+        if (!res.success) { mpStatus.textContent = 'Error: ' + res.error; mpStatus.style.color = '#ef4444'; }
+      });
+    });
+
+    if (selectLevel) selectLevel.addEventListener('change', (e) => { 
+      if (e.target.value === '3') {
+        assetWarning.style.display = 'block';
+        if (!assetsReady) { alert('Level 3 is disabled because you are missing video assets.'); selectLevel.value = '1'; assetWarning.style.display = 'none'; }
+      } else { assetWarning.style.display = 'none'; }
+    });
+
+    if (btnStartGame) btnStartGame.addEventListener('click', () => {
       const level = parseInt(selectLevel.value, 10);
       const duration = parseInt(document.getElementById('select-mp-duration').value, 10);
       socket.emit('start_game', { level, duration }, (res) => {
         if (res.success) { btnStartGame.disabled = true; btnStartGame.style.display = 'none'; levelSelector.style.display = 'none'; mpStatus.textContent = 'Waiting for countdown...'; }
+        else { mpStatus.textContent = 'Error: ' + (res.error || 'unknown'); mpStatus.style.color = '#ef4444'; }
       });
     });
+
+    const rematchBtn = document.getElementById('btn-mp-rematch');
+    if (rematchBtn) rematchBtn.addEventListener('click', () => {
+      show('multiplayer');
+      if (myRoleInRoom === 'host') { btnStartGame.disabled = false; btnStartGame.style.display = 'inline-flex'; levelSelector.style.display = 'block'; mpStatus.textContent = 'Select a level to start rematch.'; mpStatus.style.color = '#4ade80'; }
+      else { btnStartGame.disabled = true; btnStartGame.style.display = 'none'; levelSelector.style.display = 'none'; mpStatus.textContent = 'Waiting for Room Master to start rematch...'; mpStatus.style.color = '#fbbf24'; }
+    });
+
+    const mpResultBack = document.getElementById('btn-mp-result-back');
+    if (mpResultBack) mpResultBack.addEventListener('click', () => { myRoleInRoom = null; show('consent'); });
+
+    const waitingBack = document.getElementById('btn-mp-waiting-back');
+    if (waitingBack) waitingBack.addEventListener('click', () => { myRoleInRoom = null; show('consent'); });
+
+    document.addEventListener('visibilitychange', () => {
+      if (socket && socket.connected) socket.emit('visibility_change', document.visibilityState === 'visible');
+    });
+
+    show('name');
   }
 
-  const rematchBtn = document.getElementById('btn-mp-rematch');
-  if (rematchBtn) rematchBtn.addEventListener('click', () => {
-    show('multiplayer');
-    if (myRoleInRoom === 'host') {
-      btnStartGame.disabled = false; btnStartGame.style.display = 'inline-flex'; levelSelector.style.display = 'block';
-      mpStatus.textContent = 'Select a level to start rematch.'; mpStatus.style.color = '#4ade80';
-    } else {
-      btnStartGame.disabled = true; btnStartGame.style.display = 'none'; levelSelector.style.display = 'none';
-      mpStatus.textContent = 'Waiting for Room Master to start rematch...'; mpStatus.style.color = '#fbbf24';
-    }
-  });
-
-  const mpResultBack = document.getElementById('btn-mp-result-back');
-  if (mpResultBack) mpResultBack.addEventListener('click', () => { myRoleInRoom = null; show('consent'); });
-
-  const waitingBack = document.getElementById('btn-mp-waiting-back');
-  if (waitingBack) waitingBack.addEventListener('click', () => { myRoleInRoom = null; show('consent'); });
-
-  // Anti-Cheat: Detect window minimize / tab switch
-  document.addEventListener('visibilitychange', () => {
-    if (socket && socket.connected) {
-      socket.emit('visibility_change', document.visibilityState === 'visible');
-    }
-  });
-
-  // Handle cheat detection from server
-  socket.on('cheat_detected', (cheaterId) => {
-    if (cheaterId === socket.id) {
-      // I am the cheater
-      if (activeMode === 'flinch') {
-        f_composure = 0;
-        statusText.textContent = "DISQUALIFIED: Window minimized!";
-      }
-    } else {
-      // Opponent cheated
-      mpStatus.textContent = "Opponent disqualified for minimizing window.";
-      mpStatus.style.color = '#ef4444';
-    }
-  });
-
-  show('consent');
+  initApp();
 });
-
-// SOCIAL SHARE FUNCTION
-window.shareResult = function(platform, score) {
-  const url = 'https://github.com/setuju/Presage-Party';
-  const text = `I just ${score ? 'scored ' + score + ' in' : 'played'} Flinch Royale! Can you beat me? Play now:`;
-  let shareUrl = '';
-  
-  if (platform === 'whatsapp') shareUrl = `https://wa.me/?text=${encodeURIComponent(text + ' ' + url)}`;
-  else if (platform === 'telegram') shareUrl = `https://t.me/share/url?url=${encodeURIComponent(url)}&text=${encodeURIComponent(text)}`;
-  else if (platform === 'twitter') shareUrl = `https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}&url=${encodeURIComponent(url)}`;
-  else if (platform === 'instagram' || platform === 'tiktok') {
-    navigator.clipboard.writeText(text + ' ' + url);
-    alert('Link copied to clipboard! Open Instagram/TikTok and paste it in your story.');
-    return;
-  }
-  
-  window.open(shareUrl, '_blank');
-};

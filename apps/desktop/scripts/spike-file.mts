@@ -1,199 +1,92 @@
-/**
- * Phase 0a — headless useFile() spike.
- *
- * Proves: @smartspectra/node-sdk loads in pure Node 24 (no Electron),
- * authenticates with the API key, runs the file playback pipeline,
- * decodes metrics (if any), and shuts down cleanly.
- *
- * Empirical finding (2026-11-07, SDK 3.4.0):
- *   `processingStatus` JS event does NOT reliably emit kRunning or the
- *   terminal kIdle transition for file playback. `waitUntilComplete()` is
- *   documented but blocks the JS event loop, preventing metrics callbacks
- *   from firing during the block. Therefore we poll `sdk.processingStatus`
- *   in a setImmediate loop, and fall back to waitUntilComplete() only if
- *   polling never leaves kIdle within 30 s.
- *
- * Usage:
- *   SMARTSPECTRA_API_KEY=... pnpm --filter @presage-party/desktop \
- *     exec tsx scripts/spike-file.mts fixtures/face.mp4
- */
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import {
-  SmartSpectraSDK,
-  ProcessingStatus,
-  SmartSpectraErrorCode,
-  SmartSpectraLogLevel,
-  decodeMetrics,
+  SmartSpectraSDK, ProcessingStatus, SmartSpectraErrorCode,
+  SmartSpectraLogLevel, decodeMetrics, breathingMetrics, faceMetrics,
 } from '@smartspectra/node-sdk';
 
-const TIMEOUT_MS = 180_000;
-const POLL_FALLBACK_AFTER_MS = 30_000;
-const METRICS_DRAIN_MS = 100;
+const TIMEOUT_MS = Number(process.env.SPIKE_TIMEOUT_MS ?? '240000');
+const INTERFRAME_DELAY_MS = Number(process.env.INTERFRAME_DELAY_MS ?? '33');
+const METRICS_DRAIN_MS = 300;
+const SNAPSHOT_AT = new Set([400, 800, 1200, 1600]);
 
 try {
   const text = readFileSync(resolve(process.cwd(), '.env'), 'utf8');
   for (const line of text.split('\n')) {
     const m = line.match(/^\s*([A-Z_][A-Z0-9_]*)\s*=\s*(.*)\s*$/);
-    if (m && process.env[m[1]] === undefined) {
-      process.env[m[1]] = m[2].replace(/^["']|["']$/g, '');
-    }
+    if (m && process.env[m[1]] === undefined) process.env[m[1]] = m[2].replace(/^["']|["']$/g, '');
   }
-} catch {
-  /* no .env */
-}
+} catch { /* no .env */ }
 
 function statusName(n: number): string {
-  const map: Record<number, string> = {
-    [ProcessingStatus.kUninitialized]: 'kUninitialized',
-    [ProcessingStatus.kIdle]: 'kIdle',
-    [ProcessingStatus.kStarting]: 'kStarting',
-    [ProcessingStatus.kRunning]: 'kRunning',
-    [ProcessingStatus.kStopping]: 'kStopping',
-    [ProcessingStatus.kError]: 'kError',
-  };
-  return map[n] ?? `kUnknown(${n})`;
-}
-
-function errorName(n: number): string {
-  const map: Record<number, string> = {
-    [SmartSpectraErrorCode.kOk]: 'kOk',
-    [SmartSpectraErrorCode.kInvalidState]: 'kInvalidState',
-    [SmartSpectraErrorCode.kAuthenticationFailed]: 'kAuthenticationFailed',
-    [SmartSpectraErrorCode.kConfigurationFailed]: 'kConfigurationFailed',
-    [SmartSpectraErrorCode.kCreditExhausted]: 'kCreditExhausted',
-    [SmartSpectraErrorCode.kNetworkError]: 'kNetworkError',
-  };
-  return map[n] ?? `code_${n}`;
+  const m: Record<number, string> = {0:'kUninit',1:'kIdle',2:'kStarting',3:'kRunning',4:'kStopping',5:'kError'};
+  return m[n] ?? `k?(${n})`;
 }
 
 async function main(): Promise<void> {
   const apiKey = process.env.SMARTSPECTRA_API_KEY?.trim();
   const videoPath = process.argv[2];
+  if (!apiKey || !videoPath) { console.error('[spike] FAIL: usage'); process.exitCode = 10; return; }
 
-  if (!apiKey) {
-    console.error('[spike] FAIL: SMARTSPECTRA_API_KEY not set');
-    process.exitCode = 10;
-    return;
-  }
-  if (!videoPath) {
-    console.error('[spike] FAIL: usage — tsx scripts/spike-file.mts <video.mp4>');
-    process.exitCode = 11;
-    return;
-  }
-
-  console.log('[spike] sdk version:', SmartSpectraSDK.version);
-  console.log('[spike] video:', videoPath);
-  console.log('[spike] config: enableTelemetry=false, logLevel=kInfo');
+  console.log('[spike] config: metrics=BREATHING+FACE (no cardio), interframeDelayMs=' + INTERFRAME_DELAY_MS);
+  console.log('[spike] requested breathing codes: ' + JSON.stringify(breathingMetrics));
+  console.log('[spike] requested face codes:      ' + JSON.stringify(faceMetrics));
 
   const sdk = new SmartSpectraSDK({
-    apiKey,
-    enableTelemetry: false,
-    logLevel: SmartSpectraLogLevel.kInfo,
+    apiKey, enableTelemetry: false, logLevel: SmartSpectraLogLevel.kInfo,
+    requestedMetrics: [...breathingMetrics, ...faceMetrics],
   });
 
-  let metricsCount = 0;
-  let firstMetricsDumped = false;
-  let errorCount = 0;
+  let metricsCount = 0, errorCount = 0, lastStatus = -1;
+  const startedAt = Date.now();
+  const validationCounts = new Map<number, number>();
 
   sdk.on('error', (code, message, retryable) => {
     errorCount++;
-    console.error(
-      `[sdk:error] code=${code} (${errorName(code)}) retryable=${retryable} message=${JSON.stringify(message)}`,
-    );
+    console.error(`[sdk:error] t=${Date.now()-startedAt}ms code=${code} retryable=${retryable} msg=${JSON.stringify(message)}`);
   });
-
+  sdk.on('validationStatus', (code) => validationCounts.set(code, (validationCounts.get(code) ?? 0) + 1));
   sdk.on('metrics', (buf, ts) => {
     metricsCount++;
-    let decoded: unknown;
-    try {
-      decoded = decodeMetrics(buf);
-    } catch (err) {
-      console.error(`[sdk:metrics] decode failed: ${(err as Error).message}`);
-      return;
+    let d: any;
+    try { d = decodeMetrics(buf); } catch (e) { console.error('[sdk:metrics] decode failed: ' + (e as Error).message); return; }
+    if (SNAPSHOT_AT.has(metricsCount)) {
+      const printable = d?.toJSON?.() ?? d;
+      console.log(`[sdk:metrics] SNAPSHOT #${metricsCount} ts=${ts}:`);
+      console.log(JSON.stringify(printable, null, 2));
+      console.log('[sdk:metrics] (end snapshot)');
     }
-    if (!firstMetricsDumped) {
-      firstMetricsDumped = true;
-      console.log('[sdk:metrics] FIRST PACKET — full decoded shape:');
-      try {
-        const printable = (decoded as any)?.toJSON?.() ?? decoded;
-        console.log(JSON.stringify(printable, null, 2));
-      } catch {
-        console.log(String(decoded));
-      }
-      console.log('[sdk:metrics] (further packets logged every 10th)');
-      return;
-    }
-    if (metricsCount % 10 === 0) {
-      console.log(`[sdk:metrics] #${metricsCount} ts=${ts}`);
-    }
+    if (metricsCount % 100 === 0) console.log(`[sdk:metrics] #${metricsCount} ts=${ts}`);
   });
 
-  sdk.useFile(videoPath, { interframeDelayMs: 33 });
-  console.log('[spike] starting file playback...');
+  sdk.useFile(videoPath, { interframeDelayMs: INTERFRAME_DELAY_MS });
   sdk.start();
 
-  const startedAt = Date.now();
-  let settled = false;
   let sawNonIdle = false;
-  let lastPolledStatus = -1;
-  let usedFallback = false;
-
+  let exitReason: 'idle'|'error'|'timeout' = 'timeout';
   while (Date.now() - startedAt < TIMEOUT_MS) {
     await new Promise<void>((r) => setImmediate(r));
-
     const st = sdk.processingStatus;
-    if (st !== lastPolledStatus) {
-      console.log(
-        `[spike:poll] status=${statusName(st)} (${st}) t=${Date.now() - startedAt}ms`,
-      );
-      lastPolledStatus = st;
-    }
+    if (st !== lastStatus) { console.log(`[spike:poll] ${statusName(st)} (${st}) t=${Date.now()-startedAt}ms`); lastStatus = st; }
     if (st !== ProcessingStatus.kIdle) sawNonIdle = true;
-    if (st === ProcessingStatus.kError) break;
-    if (sawNonIdle && st === ProcessingStatus.kIdle) {
-      settled = true;
-      break;
-    }
-
-    if (!sawNonIdle && Date.now() - startedAt > POLL_FALLBACK_AFTER_MS) {
-      console.log(
-        '[spike:poll] never saw non-idle; falling back to waitUntilComplete()',
-      );
-      usedFallback = true;
-      const remaining = TIMEOUT_MS - (Date.now() - startedAt);
-      settled = sdk.waitUntilComplete(remaining);
-      break;
-    }
+    if (st === ProcessingStatus.kError) { exitReason = 'error'; break; }
+    if (sawNonIdle && st === ProcessingStatus.kIdle) { exitReason = 'idle'; break; }
   }
 
   await new Promise<void>((r) => setTimeout(r, METRICS_DRAIN_MS));
-
   await sdk.destroy();
-  console.log(
-    `[spike] destroyed. settled=${settled} fallback=${usedFallback} metrics=${metricsCount} errors=${errorCount}`,
-  );
 
-  if (!settled) {
-    console.error(`[spike] TIMEOUT after ${TIMEOUT_MS} ms`);
-    process.exitCode = 2;
-    return;
-  }
-  if (errorCount > 0) {
-    console.error(`[spike] completed with ${errorCount} SDK error(s)`);
-    process.exitCode = 3;
-    return;
-  }
-  if (metricsCount === 0) {
-    console.log('[spike] OK — pipeline ran end-to-end with ZERO metrics (expected for non-face video)');
-    process.exitCode = 0;
-    return;
-  }
-  console.log(`[spike] OK — ${metricsCount} metrics events`);
+  console.log('');
+  console.log('[spike] SUMMARY');
+  console.log('  exitReason =', exitReason);
+  console.log('  metrics    =', metricsCount);
+  console.log('  errors     =', errorCount);
+  console.log('  elapsed_ms =', Date.now() - startedAt);
+  console.log('  validation =', Object.fromEntries(validationCounts));
+
+  if (exitReason === 'error' || errorCount > 0) { process.exitCode = 3; return; }
+  if (exitReason === 'timeout') { process.exitCode = 2; return; }
   process.exitCode = 0;
 }
 
-main().catch((err) => {
-  console.error('[spike] unhandled:', err);
-  process.exitCode = 1;
-});
+main().catch((e) => { console.error('[spike] unhandled:', e); process.exitCode = 1; });

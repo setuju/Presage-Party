@@ -6,9 +6,9 @@ dist/
 .DS_Store
 apps/desktop/dist/
 
-# Personal face recordings (DO NOT COMMIT)
+# --- PRIVATE USER DATA (NEVER COMMIT) ---
 apps/desktop/fixtures/face30.mp4
 apps/desktop/fixtures/face30.metrics.json
-apps/desktop/fixtures/*.mov
 apps/desktop/fixtures/face.mp4
 apps/desktop/fixtures/testsrc.mp4
+apps/desktop/fixtures/*.mov

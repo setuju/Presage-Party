@@ -27,48 +27,48 @@ io.on('connection', (socket) => {
       socketToRoom.set(socket.id, code);
       socket.join(code);
       console.log(`Room created: ${code} by ${socket.id}`);
-      if (callback) callback({ success: true, roomCode: code, role: 'host' });
-    } catch (e) { console.error(e); if (callback) callback({ success: false }); }
+      if (typeof callback === 'function') callback({ success: true, roomCode: code, role: 'host' });
+    } catch (e) { console.error(e); if (typeof callback === 'function') callback({ success: false }); }
   });
 
   socket.on('join_room', (code, callback) => {
     try {
       const room = rooms.get(code);
-      if (!room) return callback && callback({ success: false, error: 'Room not found' });
-      if (room.guest) return callback && callback({ success: false, error: 'Room full' });
+      if (!room) return typeof callback === 'function' && callback({ success: false, error: 'Room not found' });
+      if (room.guest) return typeof callback === 'function' && callback({ success: false, error: 'Room full' });
 
       room.guest = socket.id;
       socketToRoom.set(socket.id, code);
       socket.join(code);
       socket.to(code).emit('player_joined', socket.id);
       socket.emit('room_joined', { host: room.host, code, role: 'guest' });
-      if (callback) callback({ success: true, role: 'guest' });
+      if (typeof callback === 'function') callback({ success: true, role: 'guest' });
       console.log(`[>] ${socket.id} joined room ${code}`);
-    } catch (e) { console.error(e); if (callback) callback({ success: false }); }
+    } catch (e) { console.error(e); if (typeof callback === 'function') callback({ success: false }); }
   });
 
   socket.on('start_game', (data, callback) => {
     try {
       const code = socketToRoom.get(socket.id);
       const room = code ? rooms.get(code) : null;
-      if (!room) return callback && callback({ success: false, error: 'Not in a room' });
-      if (room.host !== socket.id) return callback && callback({ success: false, error: 'Only host can start' });
-      if (!room.guest) return callback && callback({ success: false, error: 'No opponent yet' });
+      if (!room) return typeof callback === 'function' && callback({ success: false, error: 'Not in a room' });
+      if (room.host !== socket.id) return typeof callback === 'function' && callback({ success: false, error: 'Only host can start' });
+      if (!room.guest) return typeof callback === 'function' && callback({ success: false, error: 'No opponent yet' });
 
       room.level = (data && data.level) || 1;
       room.startAt = Date.now() + 3000;
       room.results = { host: null, guest: null };
       io.to(code).emit('game_start', { startAt: room.startAt, level: room.level });
       console.log(`[game] room ${code} starting at ${room.startAt} level ${room.level}`);
-      if (callback) callback({ success: true });
-    } catch (e) { console.error(e); if (callback) callback({ success: false }); }
+      if (typeof callback === 'function') callback({ success: true });
+    } catch (e) { console.error(e); if (typeof callback === 'function') callback({ success: false }); }
   });
 
   socket.on('report_score', (data, callback) => {
     try {
       const code = socketToRoom.get(socket.id);
       const room = code ? rooms.get(code) : null;
-      if (!room) return callback && callback({ success: false, error: 'Not in a room' });
+      if (!room) return typeof callback === 'function' && callback({ success: false, error: 'Not in a room' });
 
       const role = socket.id === room.host ? 'host' : 'guest';
       room.results[role] = data;
@@ -81,8 +81,8 @@ io.on('connection', (socket) => {
         io.to(code).emit('game_result', { host: room.results.host, guest: room.results.guest, winner });
         console.log(`[game] room ${code} result: winner=${winner}`);
       }
-      if (callback) callback({ success: true });
-    } catch (e) { console.error(e); if (callback) callback({ success: false }); }
+      if (typeof callback === 'function') callback({ success: true });
+    } catch (e) { console.error(e); if (typeof callback === 'function') callback({ success: false }); }
   });
 
   socket.on('disconnect', () => {

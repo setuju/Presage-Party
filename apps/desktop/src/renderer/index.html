@@ -10,6 +10,10 @@
     body { font-family: system-ui, sans-serif; background: #0b0b0b; color: #eee; margin: 0; min-height: 100vh; overflow: hidden; }
     .screen { display: none; min-height: 100vh; padding: 32px; }
     .screen.active { display: block; }
+    
+    /* Perbaikan untuk Layar Rules agar bisa di-scroll */
+    #screen-rules { overflow-y: auto; height: 100vh; padding-bottom: 80px; }
+
     h1 { font-weight: 600; letter-spacing: -0.03em; margin: 0 0 8px; font-size: 36px; }
     h2 { font-weight: 500; margin: 24px 0 12px; color: #ddd; }
     p { color: #aaa; margin: 6px 0; font-size: 16px; }
@@ -132,8 +136,13 @@
 
 <!-- SCREEN: RULES -->
 <div id="screen-rules" class="screen">
-  <div class="consent-wrap rules-content">
-    <h1 style="color:#fff;">How to Play</h1>
+  <div class="consent-wrap rules-content" style="margin-top: 0;">
+    <!-- Tombol Back di Atas -->
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px;">
+      <h1 style="color:#fff; margin:0; font-size: 32px;">How to Play</h1>
+      <button id="btn-rules-back-top" class="btn" style="margin:0; padding: 8px 16px; font-size: 14px;">Back to Menu</button>
+    </div>
+
     <p>Welcome to <strong>Flinch Royale</strong>. Your goal is simple: maintain your composure for 30 seconds.</p>
     
     <h2>Core Mechanics</h2>
@@ -151,7 +160,7 @@
       <li><strong>Why So Serious?:</strong> The ultimate test. Replaces standard distractors with a randomized video challenge. You must endure without laughing or flinching. No skip controls are provided.</li>
     </ul>
 
-    <div style="margin-top:32px; text-align:center;">
+    <div style="margin-top:48px; text-align:center; padding-bottom: 40px;">
       <button id="btn-rules-back" class="btn btn-primary" style="padding:16px 40px;">I Understand</button>
     </div>
   </div>
@@ -191,7 +200,6 @@
     <h1 class="result-title" id="result-title">You survived!</h1>
     <p class="result-desc" id="result-desc">Composure remaining: 100%</p>
     
-    <!-- Pesan rahasia setelah game selesai -->
     <p id="reveal-message" style="color:#666; font-size:14px; margin-top:24px; display:none; font-style:italic;">
       * The sounds and texts you experienced were entirely computer-generated for this game.
     </p>

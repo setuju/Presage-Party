@@ -61,7 +61,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
   let r_cursor = 0;
 
-  // Daftar gangguan teks/suara (Level 2)
   const distractions = [
     { type: 'speech', text: 'Is that a pimple on your nose?', lang: 'en-US' },
     { type: 'speech', text: 'Your fly is down.', lang: 'en-US' },
@@ -75,7 +74,6 @@ document.addEventListener('DOMContentLoaded', () => {
     { type: 'car', text: 'Vroooom!' }
   ];
   
-  // Daftar video tantangan (Level 3)
   const challengeVideoUrls = [];
   for (let i = 1; i <= 8; i++) {
     challengeVideoUrls.push(`presage://local/distractions/distraction_${i}.mp4`);
@@ -237,15 +235,12 @@ document.addEventListener('DOMContentLoaded', () => {
     distractionContainer.innerHTML = '';
     clearTimeout(distractionTimeout);
     
-    // Sembunyikan reveal message
     revealMessage.style.display = 'none';
 
-    // Reset Layout
     gameContainer.classList.remove('level3-mode');
     challengeVideo.pause();
     challengeVideo.removeAttribute('src');
     
-    // Setup Level Specifics
     if (level === 3) {
       gameContainer.classList.add('level3-mode');
       bgVideo.style.opacity = '0';
@@ -390,7 +385,6 @@ document.addEventListener('DOMContentLoaded', () => {
       : `Final composure: 0% · blinks: ${f_blinkCount} · talks: ${f_talkCount} · rate: ${f_rateCount}${modeText}`;
     document.getElementById('result-desc').textContent = desc;
 
-    // Tampilkan reveal message jika bukan Chill Mode
     if (currentLevel > 1) {
       revealMessage.style.display = 'block';
     }
@@ -431,7 +425,6 @@ document.addEventListener('DOMContentLoaded', () => {
     rafId = requestAnimationFrame(replayLoop);
   }
 
-  // --- Event Listeners ---
   document.getElementById('btn-level1').addEventListener('click', () => startFlinch(1));
   document.getElementById('btn-level2').addEventListener('click', () => startFlinch(2));
   document.getElementById('btn-level3').addEventListener('click', () => startFlinch(3));
@@ -442,6 +435,7 @@ document.addEventListener('DOMContentLoaded', () => {
   // Navigasi Rules
   document.getElementById('btn-rules').addEventListener('click', () => show('rules'));
   document.getElementById('btn-rules-back').addEventListener('click', () => show('consent'));
+  document.getElementById('btn-rules-back-top').addEventListener('click', () => show('consent')); // Tombol back baru di atas
 
   document.getElementById('btn-back-player').addEventListener('click', () => {
     activeMode = 'none';

@@ -155,7 +155,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const buffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
     const data = buffer.getChannelData(0);
     for (let i = 0; i < bufferSize; i++) {
-      data[i] = Math.random() * 2 - 1;
+      data[i] = rng() * 2 - 1;
     }
     const noise = audioCtx.createBufferSource();
     noise.buffer = buffer;
@@ -193,7 +193,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const bufferSize = audioCtx.sampleRate * 0.8;
     const buffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
     const data = buffer.getChannelData(0);
-    for (let i = 0; i < bufferSize; i++) data[i] = Math.random() * 2 - 1;
+    for (let i = 0; i < bufferSize; i++) data[i] = rng() * 2 - 1;
     const noise = audioCtx.createBufferSource();
     noise.buffer = buffer;
     const noiseGain = audioCtx.createGain();
@@ -211,8 +211,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const el = document.createElement('div');
     el.className = 'distraction-text';
     el.textContent = d.text;
-    el.style.left = (10 + Math.random() * 60) + '%';
-    el.style.top = (20 + Math.random() * 60) + '%';
+    el.style.left = (10 + rng() * 60) + '%';
+    el.style.top = (20 + rng() * 60) + '%';
     el.style.color = d.type === 'ringtone' ? '#fbbf24' : (d.type === 'car' ? '#f87171' : 'rgba(255,255,255,0.9)');
     distractionContainer.appendChild(el);
     
@@ -222,7 +222,7 @@ document.addEventListener('DOMContentLoaded', () => {
     else if (d.type === 'ringtone') playRingtone();
     else if (d.type === 'car') playCar();
 
-    const nextDelay = 4000 + Math.random() * 3000;
+    const nextDelay = 4000 + rng() * 3000;
     distractionTimeout = setTimeout(triggerDistraction, nextDelay);
   }
 
@@ -248,7 +248,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }, 600);
 
     // Schedule next jumpscare (random 4-7s)
-    const nextDelay = 4000 + Math.random() * 3000;
+    const nextDelay = 4000 + rng() * 3000;
     jumpscareTimeout = setTimeout(triggerJumpscare, nextDelay);
   }
 
@@ -409,7 +409,7 @@ document.addEventListener('DOMContentLoaded', () => {
         statusText.textContent = 'Sustained talking detected!';
       }
 
-      if (!s.blink && f_talkAccumMs === 0 && !isPostJumpscare && Math.random() < 0.02) {
+      if (!s.blink && f_talkAccumMs === 0 && !isPostJumpscare && rng() < 0.02) {
         statusText.textContent = 'Do not flinch.';
       }
     }

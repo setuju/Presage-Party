@@ -1,6 +1,5 @@
 'use strict';
 
-// Bungkus dalam DOMContentLoaded untuk memastikan DOM siap
 document.addEventListener('DOMContentLoaded', () => {
   const screens = {
     consent: document.getElementById('screen-consent'),
@@ -11,7 +10,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
   const bgVideo = document.getElementById('bg-video');
   const video = document.getElementById('video');
-  const distractionVideo = document.getElementById('distraction-video');
+  const challengeVideo = document.getElementById('challenge-video');
+  const gameContainer = document.getElementById('game-container');
+  
   let timeline = null;
   let videoUrl = null;
 
@@ -58,6 +59,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   let r_cursor = 0;
 
+  // Daftar gangguan teks/suara (Level 2)
   const distractions = [
     { type: 'speech', text: 'Is that a pimple on your nose?', lang: 'en-US' },
     { type: 'speech', text: 'Your fly is down.', lang: 'en-US' },
@@ -71,9 +73,10 @@ document.addEventListener('DOMContentLoaded', () => {
     { type: 'car', text: 'Vroooom!' }
   ];
   
-  const distractionVideoUrls = [];
+  // Daftar video tantangan (Level 3)
+  const challengeVideoUrls = [];
   for (let i = 1; i <= 8; i++) {
-    distractionVideoUrls.push(`presage://local/distractions/distraction_${i}.mp4`);
+    challengeVideoUrls.push(`presage://local/distractions/distraction_${i}.mp4`);
   }
 
   let audioCtx = null;
@@ -148,50 +151,47 @@ document.addEventListener('DOMContentLoaded', () => {
     noise.start();
   }
 
-  function playDistractionVideo() {
-    if (currentLevel !== 3 || distractionVideoUrls.length === 0) return;
-    const url = distractionVideoUrls[Math.floor(Math.random() * distractionVideoUrls.length)];
-    distractionVideo.src = url;
-    distractionVideo.style.display = 'block';
-    distractionVideo.style.left = (5 + Math.random() * 60) + '%';
-    distractionVideo.style.top = (5 + Math.random() * 60) + '%';
-    
-    distractionVideo.play().catch(e => {
-      console.warn('Failed to play distraction video:', e);
-      distractionVideo.style.display = 'none';
-    });
-
-    setTimeout(() => {
-      distractionVideo.pause();
-      distractionVideo.style.display = 'none';
-    }, 3000 + Math.random() * 2000);
-  }
-
   function triggerDistraction() {
-    if (activeMode !== 'flinch' || currentLevel === 1) return;
+    if (activeMode !== 'flinch' || currentLevel !== 2) return;
 
-    if (currentLevel === 3 && Math.random() < 0.6) {
-      playDistractionVideo();
-    } else {
-      const d = distractions[Math.floor(Math.random() * distractions.length)];
-      const el = document.createElement('div');
-      el.className = 'distraction-text';
-      el.textContent = d.text;
-      el.style.left = (10 + Math.random() * 60) + '%';
-      el.style.top = (20 + Math.random() * 60) + '%';
-      el.style.color = d.type === 'ringtone' ? '#fbbf24' : (d.type === 'car' ? '#f87171' : 'rgba(255,255,255,0.9)');
-      distractionContainer.appendChild(el);
-      
-      setTimeout(() => { if (el.parentNode) el.parentNode.removeChild(el); }, 3000);
+    const d = distractions[Math.floor(Math.random() * distractions.length)];
+    const el = document.createElement('div');
+    el.className = 'distraction-text';
+    el.textContent = d.text;
+    el.style.left = (10 + Math.random() * 60) + '%';
+    el.style.top = (20 + Math.random() * 60) + '%';
+    el.style.color = d.type === 'ringtone' ? '#fbbf24' : (d.type === 'car' ? '#f87171' : 'rgba(255,255,255,0.9)');
+    distractionContainer.appendChild(el);
+    
+    setTimeout(() => { if (el.parentNode) el.parentNode.removeChild(el); }, 3000);
 
-      if (d.type === 'speech') playSpeech(d.text, d.lang);
-      else if (d.type === 'ringtone') playRingtone();
-      else if (d.type === 'car') playCar();
-    }
+    if (d.type === 'speech') playSpeech(d.text, d.lang);
+    else if (d.type === 'ringtone') playRingtone();
+    else if (d.type === 'car') playCar();
 
     const nextDelay = 4000 + Math.random() * 3000;
     distractionTimeout = setTimeout(triggerDistraction, nextDelay);
   }
+
+  // --- Level 3 Logic: Random Video Challenge ---
+  function playRandomChallengeVideo() {
+    if (currentLevel !== 3 || activeMode !== 'flinch' || challengeVideoUrls.length === 0) return;
+    
+    const url = challengeVideoUrls[Math.floor(Math.random() * challengeVideoUrls.length)];
+    challengeVideo.src = url;
+    challengeVideo.play().catch(e => {
+      console.warn('Failed to play challenge video:', e);
+      // Jika gagal putar, coba video lain setelah 1 detik
+      setTimeout(playRandomChallengeVideo, 1000);
+    });
+  }
+
+  // Jika video habis sebelum 30 detik, putar video lain
+  challengeVideo.addEventListener('ended', () => {
+    if (activeMode === 'flinch' && currentLevel === 3) {
+      playRandomChallengeVideo();
+    }
+  });
 
   function show(name) {
     Object.keys(screens).forEach(k => screens[k].classList.toggle('active', k === name));
@@ -237,10 +237,23 @@ document.addEventListener('DOMContentLoaded', () => {
     window.speechSynthesis.cancel();
     distractionContainer.innerHTML = '';
     clearTimeout(distractionTimeout);
-    distractionVideo.style.display = 'none';
+
+    // Reset Layout
+    gameContainer.classList.remove('level3-mode');
+    challengeVideo.pause();
+    challengeVideo.removeAttribute('src');
     
-    if (level > 1) {
-      distractionTimeout = setTimeout(triggerDistraction, 3000);
+    // Setup Level Specifics
+    if (level === 3) {
+      gameContainer.classList.add('level3-mode');
+      bgVideo.style.opacity = '0'; // Hide blurred bg
+      // Mulai video acak pertama kali setelah 1 detik (beri waktu render layout)
+      setTimeout(playRandomChallengeVideo, 1000);
+    } else {
+      bgVideo.style.opacity = '0.2'; // Show blurred bg
+      if (level === 2) {
+        distractionTimeout = setTimeout(triggerDistraction, 3000);
+      }
     }
 
     f_composure = 100;
@@ -260,8 +273,10 @@ document.addEventListener('DOMContentLoaded', () => {
     updateFlinchUI();
     updateDebugHud();
 
-    bgVideo.currentTime = 0;
-    bgVideo.play().catch(e => console.error(e));
+    if (level !== 3) {
+      bgVideo.currentTime = 0;
+      bgVideo.play().catch(e => console.error(e));
+    }
 
     cancelAnimationFrame(rafId);
     rafId = requestAnimationFrame(flinchLoop);
@@ -357,9 +372,11 @@ document.addEventListener('DOMContentLoaded', () => {
     cancelAnimationFrame(rafId);
     clearTimeout(distractionTimeout);
     window.speechSynthesis.cancel();
+    
+    // Hentikan semua video
     bgVideo.pause();
-    distractionVideo.pause();
-    distractionVideo.style.display = 'none';
+    challengeVideo.pause();
+    challengeVideo.removeAttribute('src');
 
     document.getElementById('result-icon').textContent = survived ? '🏆' : '💀';
     document.getElementById('result-title').textContent = survived ? 'You survived!' : 'Eliminated';

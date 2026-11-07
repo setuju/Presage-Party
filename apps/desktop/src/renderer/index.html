@@ -34,8 +34,8 @@
     
     /* Flinch Game */
     #screen-flinch { padding: 0; position: relative; background: #000; }
-    #bg-video { position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover; opacity: 0.2; z-index: 0; filter: blur(12px); }
-    .game-hud { position: relative; z-index: 10; display: flex; flex-direction: column; height: 100vh; padding: 40px; align-items: center; justify-content: center; }
+    #bg-video { position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover; opacity: 0.2; z-index: 0; filter: blur(12px); pointer-events: none; }
+    .game-hud { position: relative; z-index: 10; display: flex; flex-direction: column; height: 100vh; padding: 40px; align-items: center; justify-content: center; pointer-events: none; }
     
     .composure-container { width: 100%; max-width: 900px; margin-bottom: 48px; text-align: center; position: relative; z-index: 10; }
     .composure-bar-bg { width: 100%; height: 48px; background: #1a1a1a; border-radius: 24px; overflow: hidden; border: 2px solid #333; box-shadow: inset 0 2px 10px rgba(0,0,0,0.8); }
@@ -68,7 +68,7 @@
     }
     
     /* Video Challenge (Level 3) */
-    #distraction-video { position: absolute; top: 10%; left: 10%; width: 320px; height: auto; z-index: 15; border: 3px solid #fff; border-radius: 12px; box-shadow: 0 10px 40px rgba(0,0,0,0.9); display: none; object-fit: cover; }
+    #distraction-video { position: absolute; top: 10%; left: 10%; width: 320px; height: auto; z-index: 15; border: 3px solid #fff; border-radius: 12px; box-shadow: 0 10px 40px rgba(0,0,0,0.9); display: none; object-fit: cover; pointer-events: none; }
 
     .center { text-align: center; padding-top: 80px; }
     .result-icon { font-size: 100px; margin-bottom: 24px; filter: drop-shadow(0 10px 20px rgba(0,0,0,0.5)); }
@@ -76,7 +76,7 @@
     .result-desc { font-size: 20px; color: #aaa; }
     .debug-hud { position: absolute; bottom: 20px; right: 20px; z-index: 30;
                  font-family: ui-monospace, monospace; font-size: 12px; color: #666;
-                 background: rgba(0,0,0,0.8); padding: 8px 12px; border-radius: 6px; border: 1px solid #222; }
+                 background: rgba(0,0,0,0.8); padding: 8px 12px; border-radius: 6px; border: 1px solid #222; pointer-events: none; }
   </style>
 </head>
 <body>
@@ -100,9 +100,9 @@
     <p>This build uses <strong>replay mode</strong>. No live camera is accessed.</p>
 
     <div style="display:flex; gap:16px; margin-top:32px; flex-wrap:wrap;">
-      <button id="btn-level1" class="btn btn-primary" style="flex:1;">Level 1 (Normal)</button>
-      <button id="btn-level2" class="btn btn-level2" style="flex:1;">Level 2 (Distractions)</button>
-      <button id="btn-level3" class="btn btn-level3" style="flex:1;">Level 3 (Try Me)</button>
+      <button id="btn-level1" class="btn btn-primary" style="flex:1;">Chill Mode</button>
+      <button id="btn-level2" class="btn btn-level2" style="flex:1;">Seriously?</button>
+      <button id="btn-level3" class="btn btn-level3" style="flex:1;">Why So Serious?</button>
       <button id="btn-replay" class="btn" style="width:100%;">Metrics Replay (Dev)</button>
     </div>
   </div>

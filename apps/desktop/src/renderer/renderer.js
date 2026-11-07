@@ -1,6 +1,7 @@
 'use strict';
 
-(function () {
+// Bungkus dalam DOMContentLoaded untuk memastikan DOM siap
+document.addEventListener('DOMContentLoaded', () => {
   const screens = {
     consent: document.getElementById('screen-consent'),
     flinch: document.getElementById('screen-flinch'),
@@ -14,7 +15,6 @@
   let timeline = null;
   let videoUrl = null;
 
-  // UI elements
   const composureBar = document.getElementById('composure-bar');
   const composureLabel = document.getElementById('composure-label');
   const timerEl = document.getElementById('timer');
@@ -33,7 +33,6 @@
   let distractionTimeout = null;
   let currentLevel = 1;
 
-  // Tunables
   const F_DURATION_MS        = 30000;
   const F_PENALTY_BLINK      = 4;
   const BLINK_COOLDOWN_MS    = 2000;
@@ -59,7 +58,6 @@
 
   let r_cursor = 0;
 
-  // --- Distraction Lists ---
   const distractions = [
     { type: 'speech', text: 'Is that a pimple on your nose?', lang: 'en-US' },
     { type: 'speech', text: 'Your fly is down.', lang: 'en-US' },
@@ -68,7 +66,7 @@
     { type: 'speech', text: 'You have something on your face.', lang: 'en-US' },
     { type: 'speech', text: 'I am watching you.', lang: 'en-US' },
     { type: 'speech', text: 'Are you nervous?', lang: 'en-US' },
-    { type: 'speech', text: 'Don\\'t blink. I dare you.', lang: 'en-US' },
+    { type: 'speech', text: 'Don\'t blink. I dare you.', lang: 'en-US' },
     { type: 'ringtone', text: 'Brrring! Brrring!' },
     { type: 'car', text: 'Vroooom!' }
   ];
@@ -367,8 +365,8 @@
     document.getElementById('result-title').textContent = survived ? 'You survived!' : 'Eliminated';
     
     let modeText = '';
-    if (currentLevel === 2) modeText = ' (Level 2)';
-    if (currentLevel === 3) modeText = ' (Level 3)';
+    if (currentLevel === 2) modeText = ' (Seriously?)';
+    if (currentLevel === 3) modeText = ' (Why So Serious?)';
     
     const desc = survived
       ? `Composure: ${Math.round(f_composure)}% · blinks: ${f_blinkCount} · rate: ${f_rateCount}${modeText}`
@@ -424,4 +422,4 @@
   });
 
   show('consent');
-})();
+});

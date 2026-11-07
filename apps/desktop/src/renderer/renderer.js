@@ -520,7 +520,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (socket) return;
     
     // Koneksi ke server lokal (port 3000)
-    socket = io('http://localhost:3000');
+    socket = io('http://127.0.0.1:3000');
 
     socket.on('connect', () => {
       mpStatus.textContent = 'Connected to server!';

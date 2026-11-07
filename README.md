@@ -58,6 +58,7 @@ Roadmap: [`ROADMAP.md`](./ROADMAP.md).
 Play against a friend locally or over the network!
 - **Private & Public Rooms:** Create a room with an optional password.
 - **Synchronized Gameplay:** Both players face the exact same video sequence and jumpscares, guaranteed by deterministic room-code hashing.
+- **Dynamic Rematches:** Every rematch rotates the distraction sequence by +3, keeping the game fresh and unpredictable.
 - **Anti-Cheat:** Minimizing the window during a match will result in instant disqualification.
 - **Host Migration:** If the host leaves, the guest is automatically promoted.
 

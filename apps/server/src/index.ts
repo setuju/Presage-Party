@@ -11,7 +11,7 @@ app.get('/', (req, res) => res.send('Presage Party Server is running.'));
 interface ScoreReport { score: number; blinks: number; talks: number; rateSpikes: number; survived: boolean; }
 interface Room { 
   code: string; host: string; guest: string | null; startAt: number | null; 
-  level: number; duration: number; results: { host: ScoreReport | null; guest: ScoreReport | null };
+  level: number; duration: number; results: { host: ScoreReport | null; guest: ScoreReport | null }; rematchCount: number;
   password: string | null; hostName: string; guestName: string | null;
 }
 
@@ -50,7 +50,7 @@ io.on('connection', (socket) => {
       
       rooms.set(code, { 
         code, host: socket.id, guest: null, startAt: null, level: 1, duration: 30, 
-        results: { host: null, guest: null }, password: pwd, hostName, guestName: null
+        results: { host: null, guest: null }, password: pwd, hostName, guestName: null, rematchCount: 0
       });
       socketToRoom.set(socket.id, code);
       socket.join(code);
@@ -95,10 +95,11 @@ io.on('connection', (socket) => {
       room.level = (data && data.level) || 1;
       room.duration = (data && data.duration) || 30;
       room.startAt = Date.now() + 3000;
+      room.rematchCount = (room.rematchCount || 0) + 1;
       room.results = { host: null, guest: null };
       broadcastRoomList();
       
-      io.to(code).emit('game_start', { startAt: room.startAt, level: room.level, duration: room.duration, roomCode: code });
+      io.to(code).emit('game_start', { startAt: room.startAt, level: room.level, duration: room.duration, roomCode: code, rematchCount: room.rematchCount });
       if (typeof callback === 'function') callback({ success: true });
       console.log(`[game] room ${code} starting at ${room.startAt} level ${room.level}`);
     } catch (e) { if (typeof callback === 'function') callback({ success: false }); }

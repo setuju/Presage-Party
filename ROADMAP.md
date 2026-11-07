@@ -85,6 +85,7 @@ Playtest ended with 39% composure, proving the game is winnable but tense.
 - [x] Flinch Royale remote: synchronized deterministic logic
 - [x] Host migration (if host leaves, guest becomes host)
 - [x] Anti-cheat (minimize detection)
+- [x] Rematch Rotation (+3 offset for video/text/jumpscare sequences)
 
 **Exit criterion:** two laptops on the same LAN, playing one full round,
 with no cheats passing plausibility checks.

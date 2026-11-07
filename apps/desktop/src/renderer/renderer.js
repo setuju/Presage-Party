@@ -75,6 +75,7 @@ document.addEventListener('DOMContentLoaded', () => {
   let myRoleInRoom = null;
   let socket = null;
   let myUsername = 'Player';
+  let videoOffset = 0;
   let assetsReady = false;
 
   let currentRng = Math.random;
@@ -189,7 +190,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
   function triggerDistraction() {
     if (activeMode !== 'flinch' || currentLevel !== 2) return;
-    const d = distractions[Math.floor(currentRng() * distractions.length)];
+    const baseTxtIdx = Math.floor(currentRng() * distractions.length);
+    const txtIdx = (baseTxtIdx + videoOffset) % distractions.length;
+    const d = distractions[txtIdx];
     const el = document.createElement('div'); el.className = 'distraction-text'; el.textContent = d.text;
     el.style.left = (10 + Math.random() * 60) + '%'; el.style.top = (20 + Math.random() * 60) + '%';
     el.style.color = d.type === 'ringtone' ? '#fbbf24' : (d.type === 'car' ? '#f87171' : 'rgba(255,255,255,0.9)');
@@ -202,14 +205,18 @@ document.addEventListener('DOMContentLoaded', () => {
 
   function playRandomChallengeVideo() {
     if (currentLevel !== 3 || activeMode !== 'flinch' || challengeVideoUrls.length === 0) return;
-    const url = challengeVideoUrls[Math.floor(currentRng() * challengeVideoUrls.length)];
+    const baseIdx = Math.floor(currentRng() * challengeVideoUrls.length);
+    const idx = (baseIdx + videoOffset) % challengeVideoUrls.length;
+    const url = challengeVideoUrls[idx];
     challengeVideo.src = url;
     challengeVideo.play().catch(e => setTimeout(playRandomChallengeVideo, 1000));
   }
 
   function triggerJumpscare() {
     if (activeMode !== 'flinch' || currentLevel !== 4) return;
-    jumpscareFace.textContent = scaryFaces[Math.floor(currentRng() * scaryFaces.length)];
+    const baseJumpIdx = Math.floor(currentRng() * scaryFaces.length);
+    const jumpIdx = (baseJumpIdx + videoOffset) % scaryFaces.length;
+    jumpscareFace.textContent = scaryFaces[jumpIdx];
     playScream();
     jumpscareOverlay.classList.add('active');
     isPostJumpscare = true;
@@ -506,6 +513,8 @@ document.addEventListener('DOMContentLoaded', () => {
     socket.on('game_start', (payload) => {
       const delay = Math.max(0, (payload.startAt || Date.now()) - Date.now());
       if (payload.roomCode) currentRng = mulberry32(hashRoomCode(payload.roomCode));
+      // Setiap rematch, tambah offset 3
+      videoOffset = ((payload.rematchCount || 1) - 1) * 3;
       mpStatus.textContent = 'Starting in ' + Math.ceil(delay / 1000) + '...';
       mpStatus.style.color = '#fbbf24';
       setTimeout(() => { startFlinch(payload.level, payload.duration || 30, (scoreData) => { socket.emit('report_score', scoreData); show('mp-waiting'); }); }, delay);

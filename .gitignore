@@ -5,4 +5,8 @@ dist/
 *.log
 .DS_Store
 apps/desktop/dist/
-apps/desktop/fixtures/
+
+# Personal face recordings (DO NOT COMMIT)
+apps/desktop/fixtures/face30.mp4
+apps/desktop/fixtures/face30.metrics.json
+apps/desktop/fixtures/*.mov

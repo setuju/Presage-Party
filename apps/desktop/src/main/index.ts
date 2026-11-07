@@ -1,12 +1,14 @@
-import { app, BrowserWindow, ipcMain, protocol, net } from 'electron';
-import { readFileSync, stat, createReadStream } from 'node:fs';
+import { app, BrowserWindow, ipcMain, protocol } from 'electron';
+import { readFileSync, stat, createReadStream, existsSync } from 'node:fs';
 import { join } from 'node:path';
-import { pathToFileURL } from 'node:url';
 import { Readable } from 'node:stream';
 
 const FIXTURES_DIR = join(__dirname, '..', '..', 'fixtures');
 const TIMELINE_PATH = join(FIXTURES_DIR, 'face30.metrics.json');
 const VIDEO_URL = 'presage://local/face30.mp4';
+
+// Opsional: Nonaktifkan hardware acceleration jika video masih stutter.
+// app.disableHardwareAcceleration();
 
 protocol.registerSchemesAsPrivileged([
   { scheme: 'presage', privileges: { standard: true, secure: true, supportFetchAPI: true, stream: true } },
@@ -29,7 +31,6 @@ function createWindow(): void {
 }
 
 app.whenReady().then(() => {
-  // Robust video streaming with HTTP 206 Partial Content (Range Requests)
   protocol.handle('presage', async (request) => {
     const url = new URL(request.url);
     const filename = url.pathname.replace(/^\/+/, '');
@@ -48,7 +49,10 @@ app.whenReady().then(() => {
         const chunksize = (end - start) + 1;
         const stream = createReadStream(filePath, { start, end });
         
-        return new Response(Readable.toWeb(stream) as any, {
+        // Konversi eksplisit Node.js ReadStream ke Web ReadableStream
+        const webStream = Readable.toWeb(stream) as any;
+        
+        return new Response(webStream, {
           status: 206,
           headers: {
             'Content-Range': `bytes ${start}-${end}/${fileStat.size}`,
@@ -59,11 +63,13 @@ app.whenReady().then(() => {
         });
       } else {
         const stream = createReadStream(filePath);
-        return new Response(Readable.toWeb(stream) as any, {
+        const webStream = Readable.toWeb(stream) as any;
+        return new Response(webStream, {
           status: 200,
           headers: {
             'Content-Length': fileStat.size.toString(),
             'Content-Type': filename.endsWith('.mp4') ? 'video/mp4' : 'application/octet-stream',
+            'Accept-Ranges': 'bytes',
           }
         });
       }
@@ -74,6 +80,14 @@ app.whenReady().then(() => {
 
   ipcMain.handle('get-timeline', () => readTimeline());
   ipcMain.handle('get-video-url', () => VIDEO_URL);
+  ipcMain.handle('check-assets', () => {
+    const distDir = join(FIXTURES_DIR, 'distractions');
+    let missing = 0;
+    for (let i = 1; i <= 8; i++) {
+      if (!existsSync(join(distDir, `distraction_${i}.mp4`))) missing++;
+    }
+    return { ready: missing === 0, missing };
+  });
 
   createWindow();
   app.on('activate', () => { if (BrowserWindow.getAllWindows().length === 0) createWindow(); });

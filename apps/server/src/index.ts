@@ -119,8 +119,13 @@ io.on('connection', (socket) => {
         const hScore = room.results.host.score || 0;
         const gScore = room.results.guest.score || 0;
         const winner = hScore > gScore ? 'host' : gScore > hScore ? 'guest' : 'tie';
+        
+        // Kirim hasil
         io.to(code).emit('game_result', { host: room.results.host, guest: room.results.guest, winner, hostName: room.hostName, guestName: room.guestName });
         console.log(`[game] room ${code} result: winner=${winner}`);
+
+        // MATIKAN ANTI-CHEAT setelah game selesai
+        room.startAt = null; 
       }
       if (typeof callback === 'function') callback({ success: true });
     } catch (e) { if (typeof callback === 'function') callback({ success: false }); }

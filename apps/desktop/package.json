@@ -3,10 +3,10 @@
   "version": "0.0.0",
   "private": true,
   "type": "commonjs",
-  "main": "dist/main/index.js",
+  "main": "src/main/index.ts",
   "scripts": {
     "build": "tsc",
-    "dev": "pnpm build && electron .",
+    "dev": "electron --import tsx .",
     "spike": "tsx scripts/spike-file.mts"
   },
   "dependencies": {

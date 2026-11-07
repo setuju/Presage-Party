@@ -20,6 +20,7 @@
   const statusText = document.getElementById('status-text');
   const alertFlinch = document.getElementById('alert-flinch');
   const debugHud = document.getElementById('debug-hud');
+  const distractionContainer = document.getElementById('distraction-container');
 
   const mBr = document.getElementById('m-br');
   const mRate = document.getElementById('m-rate');
@@ -28,32 +29,28 @@
 
   let rafId = 0;
   let activeMode = 'none';
+  let distractionTimeout = null;
+  let isHardMode = false;
 
-  // --- Tunables (survivable by default) ---
+  // --- Tunables ---
   const F_DURATION_MS        = 30000;
-  
-  const F_PENALTY_BLINK      = 4;      // -4 per blink (max ~6 blinks/30s = -24)
+  const F_PENALTY_BLINK      = 4;
   const BLINK_COOLDOWN_MS    = 2000;
-
-  const F_PENALTY_TALK       = 8;      // -8 per sustained talk event
-  const TALK_SUSTAIN_MS      = 2000;   // must talk continuously for 2s to trigger
-  const TALK_COOLDOWN_MS     = 4000;   // 4s cooldown after a talk penalty
-
-  const F_RATE_THRESHOLD     = 24;     // raised from 22, normal talking breathes faster
-  const F_RATE_PENALTY_TICK  = 1000;   // -1 per second above 24 bpm
+  const F_PENALTY_TALK       = 8;
+  const TALK_SUSTAIN_MS      = 2000;
+  const TALK_COOLDOWN_MS     = 4000;
+  const F_RATE_THRESHOLD     = 24;
+  const F_RATE_PENALTY_TICK  = 1000;
   const F_RATE_PENALTY       = 1;
 
   // Flinch State
   let f_composure = 100;
   let f_startTime = 0;
   let f_lastFrameTime = 0;
-  
   let f_lastBlinkState = false;
   let f_lastBlinkPenaltyTime = -Infinity;
-  
   let f_talkAccumMs = 0;
   let f_lastTalkPenaltyTime = -Infinity;
-
   let f_lastRatePenaltyTime = -Infinity;
 
   // Debug counters
@@ -64,6 +61,123 @@
   // Replay State
   let r_cursor = 0;
 
+  // --- Audio/Visual Distractions ---
+  const distractions = [
+    { type: 'speech', text: 'Hey you, I am here', lang: 'en-US' },
+    { type: 'speech', text: 'You dropped your money on the floor', lang: 'en-US' },
+    { type: 'speech', text: 'Does somebody see my cat?', lang: 'en-US' },
+    { type: 'speech', text: 'Hey, I know you', lang: 'en-US' },
+    { type: 'speech', text: 'I love you', lang: 'en-US' },
+    { type: 'speech', text: 'Je t\'aime', lang: 'fr-FR' },
+    { type: 'ringtone', text: 'Brrring! Brrring!' },
+    { type: 'car', text: 'Vroooom!' },
+    { type: 'speech', text: '(Loud laughter)', lang: 'en-US' } // Web speech can't laugh, but it will read this weirdly which is funny
+  ];
+
+  let audioCtx = null;
+
+  function initAudio() {
+    if (!audioCtx) {
+      audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    }
+  }
+
+  function playSpeech(text, lang) {
+    if ('speechSynthesis' in window) {
+      const utter = new SpeechSynthesisUtterance(text);
+      utter.lang = lang;
+      utter.rate = 1.1;
+      utter.pitch = lang === 'fr-FR' ? 1.2 : 1.0;
+      window.speechSynthesis.speak(utter);
+    }
+  }
+
+  function playRingtone() {
+    if (!audioCtx) return;
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(880, audioCtx.currentTime); // A5
+    gain.gain.setValueAtTime(0.1, audioCtx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.5);
+    osc.connect(gain);
+    gain.connect(audioCtx.destination);
+    osc.start();
+    osc.stop(audioCtx.currentTime + 0.5);
+    
+    // Second ring after 0.6s
+    setTimeout(() => {
+      if (!audioCtx) return;
+      const osc2 = audioCtx.createOscillator();
+      const gain2 = audioCtx.createGain();
+      osc2.type = 'sine';
+      osc2.frequency.setValueAtTime(880, audioCtx.currentTime);
+      gain2.gain.setValueAtTime(0.1, audioCtx.currentTime);
+      gain2.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.5);
+      osc2.connect(gain2);
+      gain2.connect(audioCtx.destination);
+      osc2.start();
+      osc2.stop(audioCtx.currentTime + 0.5);
+    }, 600);
+  }
+
+  function playCar() {
+    if (!audioCtx) return;
+    const bufferSize = audioCtx.sampleRate * 2; // 2 seconds
+    const buffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
+    const data = buffer.getChannelData(0);
+    for (let i = 0; i < bufferSize; i++) {
+      data[i] = Math.random() * 2 - 1; // white noise
+    }
+    const noise = audioCtx.createBufferSource();
+    noise.buffer = buffer;
+    const filter = audioCtx.createBiquadFilter();
+    filter.type = 'lowpass';
+    filter.frequency.setValueAtTime(200, audioCtx.currentTime);
+    filter.frequency.linearRampToValueAtTime(800, audioCtx.currentTime + 1);
+    filter.frequency.linearRampToValueAtTime(200, audioCtx.currentTime + 2);
+    
+    const gain = audioCtx.createGain();
+    gain.gain.setValueAtTime(0, audioCtx.currentTime);
+    gain.gain.linearRampToValueAtTime(0.2, audioCtx.currentTime + 0.5);
+    gain.gain.linearRampToValueAtTime(0, audioCtx.currentTime + 2);
+
+    noise.connect(filter);
+    filter.connect(gain);
+    gain.connect(audioCtx.destination);
+    noise.start();
+  }
+
+  function triggerDistraction() {
+    if (activeMode !== 'flinch' || !isHardMode) return;
+
+    // Pick random distraction
+    const d = distractions[Math.floor(Math.random() * distractions.length)];
+
+    // Spawn visual text
+    const el = document.createElement('div');
+    el.className = 'distraction-text';
+    el.textContent = d.text;
+    // Random position
+    el.style.left = (10 + Math.random() * 60) + '%';
+    el.style.top = (20 + Math.random() * 60) + '%';
+    el.style.color = d.type === 'ringtone' ? '#fbbf24' : (d.type === 'car' ? '#f87171' : 'rgba(255,255,255,0.9)');
+    distractionContainer.appendChild(el);
+    
+    // Cleanup element
+    setTimeout(() => { if (el.parentNode) el.parentNode.removeChild(el); }, 3000);
+
+    // Play audio
+    if (d.type === 'speech') playSpeech(d.text, d.lang);
+    else if (d.type === 'ringtone') playRingtone();
+    else if (d.type === 'car') playCar();
+
+    // Schedule next distraction (every 4-7 seconds)
+    const nextDelay = 4000 + Math.random() * 3000;
+    distractionTimeout = setTimeout(triggerDistraction, nextDelay);
+  }
+
+  // --- Helpers ---
   function show(name) {
     Object.keys(screens).forEach(k => screens[k].classList.toggle('active', k === name));
   }
@@ -99,10 +213,19 @@
   }
 
   // --- FLINCH GAME ---
-  async function startFlinch() {
+  async function startFlinch(hard) {
     if (!await loadData()) return;
+    isHardMode = hard;
     activeMode = 'flinch';
     show('flinch');
+
+    initAudio();
+    window.speechSynthesis.cancel(); // Stop any previous speech
+    distractionContainer.innerHTML = '';
+    clearTimeout(distractionTimeout);
+    if (isHardMode) {
+      distractionTimeout = setTimeout(triggerDistraction, 3000); // First distraction after 3s
+    }
 
     f_composure = 100;
     f_startTime = performance.now();
@@ -141,7 +264,6 @@
     if (elapsed >= F_DURATION_MS) { endFlinch(true); return; }
     timerEl.textContent = Math.ceil(timeLeft);
 
-    // Find current sample
     const samples = timeline.samples || [];
     let s = null;
     for (let i = 0; i < samples.length; i++) {
@@ -150,7 +272,7 @@
     }
 
     if (s) {
-      // --- Blink (edge + cooldown) ---
+      // Blink
       if (s.blink && !f_lastBlinkState) {
         if (elapsed - f_lastBlinkPenaltyTime >= BLINK_COOLDOWN_MS) {
           f_composure -= F_PENALTY_BLINK;
@@ -162,29 +284,27 @@
       }
       f_lastBlinkState = s.blink;
 
-      // --- Talking (time-based accumulation) ---
+      // Talk
       if (s.talk) {
         f_talkAccumMs += dt;
       } else {
-        f_talkAccumMs = Math.max(0, f_talkAccumMs - (dt * 2)); // decays twice as fast
+        f_talkAccumMs = Math.max(0, f_talkAccumMs - (dt * 2));
       }
 
       if (f_talkAccumMs >= TALK_SUSTAIN_MS && (elapsed - f_lastTalkPenaltyTime >= TALK_COOLDOWN_MS)) {
         f_composure -= F_PENALTY_TALK;
         f_talkCount++;
         f_lastTalkPenaltyTime = elapsed;
-        f_talkAccumMs = 0; // reset
+        f_talkAccumMs = 0;
         popAlert('TALKING!');
         statusText.textContent = 'Sustained talking detected!';
       }
 
-      // Reset text
       if (!s.blink && f_talkAccumMs === 0 && Math.random() < 0.02) {
         statusText.textContent = 'Do not flinch.';
       }
     }
 
-    // --- Rate (per-second penalty) ---
     const rate = findRate(tMs);
     if (rate && rate.value > F_RATE_THRESHOLD) {
       if (elapsed - f_lastRatePenaltyTime >= F_RATE_PENALTY_TICK) {
@@ -221,14 +341,17 @@
   function endFlinch(survived) {
     activeMode = 'none';
     cancelAnimationFrame(rafId);
+    clearTimeout(distractionTimeout);
+    window.speechSynthesis.cancel();
     bgVideo.pause();
 
     document.getElementById('result-icon').textContent = survived ? '🏆' : '💀';
     document.getElementById('result-title').textContent = survived ? 'You survived!' : 'Eliminated';
     
+    const modeText = isHardMode ? ' (Hard Mode)' : '';
     const desc = survived
-      ? `Composure remaining: ${Math.round(f_composure)}% · blinks: ${f_blinkCount} · rate: ${f_rateCount}`
-      : `Final composure: 0% · blinks: ${f_blinkCount} · talks: ${f_talkCount} · rate: ${f_rateCount}`;
+      ? `Composure: ${Math.round(f_composure)}% · blinks: ${f_blinkCount} · rate: ${f_rateCount}${modeText}`
+      : `Final composure: 0% · blinks: ${f_blinkCount} · talks: ${f_talkCount} · rate: ${f_rateCount}${modeText}`;
     document.getElementById('result-desc').textContent = desc;
 
     show('flinchResult');
@@ -269,9 +392,10 @@
   }
 
   // --- EVENTS ---
-  document.getElementById('btn-flinch').addEventListener('click', startFlinch);
+  document.getElementById('btn-normal').addEventListener('click', () => startFlinch(false));
+  document.getElementById('btn-hard').addEventListener('click', () => startFlinch(true));
   document.getElementById('btn-replay').addEventListener('click', startReplay);
-  document.getElementById('btn-flinch-restart').addEventListener('click', startFlinch);
+  document.getElementById('btn-flinch-restart').addEventListener('click', () => startFlinch(isHardMode));
   document.getElementById('btn-back').addEventListener('click', () => { show('consent'); });
   document.getElementById('btn-back-player').addEventListener('click', () => {
     activeMode = 'none';

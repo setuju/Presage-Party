@@ -11,7 +11,6 @@
     .screen { display: none; min-height: 100vh; padding: 32px; }
     .screen.active { display: block; }
     
-    /* Perbaikan untuk Layar Rules agar bisa di-scroll */
     #screen-rules { overflow-y: auto; height: 100vh; padding-bottom: 80px; }
 
     h1 { font-weight: 600; letter-spacing: -0.03em; margin: 0 0 8px; font-size: 36px; }
@@ -31,6 +30,8 @@
     .btn-level2:hover { background: #2a2a1a; border-color: #fbbf24; box-shadow: 0 4px 12px rgba(251, 191, 36, 0.2); }
     .btn-level3 { border-color: #f87171; color: #f87171; }
     .btn-level3:hover { background: #2a1a1a; border-color: #f87171; box-shadow: 0 4px 12px rgba(248, 113, 113, 0.2); }
+    .btn-level4 { border-color: #9333ea; color: #9333ea; background: #1a0b22; }
+    .btn-level4:hover { background: #2a1a3a; border-color: #a855f7; box-shadow: 0 4px 12px rgba(168, 85, 247, 0.3); }
     
     .consent-wrap { max-width: 680px; background: #111; padding: 40px; border-radius: 12px; border: 1px solid #222; box-shadow: 0 10px 40px rgba(0,0,0,0.5); margin: 40px auto; }
     .privacy { background: #181818; border: 1px solid #333; padding: 20px; border-radius: 8px; margin: 24px 0; }
@@ -47,9 +48,7 @@
     .game-container.level3-mode { flex-direction: row; gap: 48px; background: #0b0b0b; pointer-events: auto; }
     .level3-video-wrapper { display: none; flex: 1; justify-content: flex-end; max-width: 60%; }
     .game-container.level3-mode .level3-video-wrapper { display: flex; }
-    
     #challenge-video { width: 100%; max-height: 85vh; border-radius: 12px; box-shadow: 0 20px 50px rgba(0,0,0,0.9); border: 2px solid #333; object-fit: contain; background: #000; pointer-events: none; }
-    
     .game-container.level3-mode .game-hud { flex: 1; max-width: 400px; align-items: flex-start; justify-content: center; }
     .game-container.level3-mode .composure-container { margin-bottom: 32px; text-align: left; }
     .game-container.level3-mode .composure-label { text-align: left; }
@@ -87,6 +86,22 @@
         100% { opacity: 0; transform: translateY(-80px) scale(0.9); }
     }
 
+    /* Jumpscare Overlay (Level 4) */
+    #jumpscare-overlay { display: none; position: absolute; top: 0; left: 0; width: 100vw; height: 100vh; z-index: 9999; justify-content: center; align-items: center; background: #000; }
+    #jumpscare-overlay.active { display: flex; animation: flash 0.6s ease-out forwards; }
+    .jumpscare-face { font-size: 250px; animation: scaleUp 0.6s ease-out forwards; filter: drop-shadow(0 0 50px red); }
+    @keyframes flash {
+        0% { opacity: 1; background: #fff; }
+        20% { opacity: 1; background: #ef4444; }
+        80% { opacity: 1; background: #000; }
+        100% { opacity: 0; }
+    }
+    @keyframes scaleUp {
+        0% { transform: scale(0.2); }
+        50% { transform: scale(1.5); }
+        100% { transform: scale(2); }
+    }
+
     .center { text-align: center; padding-top: 80px; }
     .result-icon { font-size: 100px; margin-bottom: 24px; filter: drop-shadow(0 10px 20px rgba(0,0,0,0.5)); }
     .result-title { font-size: 48px; margin-bottom: 16px; }
@@ -95,7 +110,6 @@
                  font-family: ui-monospace, monospace; font-size: 12px; color: #666;
                  background: rgba(0,0,0,0.8); padding: 8px 12px; border-radius: 6px; border: 1px solid #222; pointer-events: none; }
                  
-    /* Rules Screen */
     .rules-content { text-align: left; line-height: 1.6; color: #ccc; }
     .rules-content h2 { color: #4ade80; margin-top: 24px; border-bottom: 1px solid #333; padding-bottom: 8px; }
     .rules-content ul { margin-bottom: 20px; }
@@ -127,7 +141,10 @@
       <button id="btn-level2" class="btn btn-level2" style="flex:1;">Seriously?</button>
       <button id="btn-level3" class="btn btn-level3" style="flex:1;">Why So Serious?</button>
     </div>
-    <div style="margin-top:12px;">
+    <div style="display:flex; gap:12px; margin-top:12px; flex-wrap:wrap;">
+      <button id="btn-level4" class="btn btn-level4" style="flex:1;">Don't Scream (Horror)</button>
+    </div>
+    <div style="margin-top:16px;">
       <button id="btn-rules" class="btn" style="width:100%; border-color:#555;">View Game Rules</button>
       <button id="btn-replay" class="btn" style="width:100%; color:#666; border-color:#222; font-size:14px; padding:10px;">Metrics Replay (Dev)</button>
     </div>
@@ -137,7 +154,6 @@
 <!-- SCREEN: RULES -->
 <div id="screen-rules" class="screen">
   <div class="consent-wrap rules-content" style="margin-top: 0;">
-    <!-- Tombol Back di Atas -->
     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px;">
       <h1 style="color:#fff; margin:0; font-size: 32px;">How to Play</h1>
       <button id="btn-rules-back-top" class="btn" style="margin:0; padding: 8px 16px; font-size: 14px;">Back to Menu</button>
@@ -158,6 +174,7 @@
       <li><strong>Chill Mode:</strong> The baseline test. No external distractions.</li>
       <li><strong>Seriously?:</strong> Adds unpredictable computer-generated auditory and visual distractors designed to break your focus.</li>
       <li><strong>Why So Serious?:</strong> The ultimate test. Replaces standard distractors with a randomized video challenge. You must endure without laughing or flinching. No skip controls are provided.</li>
+      <li><strong>Don't Scream:</strong> A horror experience. Prepare for sudden, intense audiovisual jumpscares. Blinking or a heart rate spike immediately after a scare will result in severe composure loss.</li>
     </ul>
 
     <div style="margin-top:48px; text-align:center; padding-bottom: 40px;">
@@ -190,6 +207,12 @@
   
   <div id="distraction-container"></div>
   <div class="alert-flinch" id="alert-flinch">FLINCH!</div>
+  
+  <!-- Jumpscare Overlay -->
+  <div id="jumpscare-overlay">
+    <div class="jumpscare-face" id="jumpscare-face">😱</div>
+  </div>
+
   <div class="debug-hud" id="debug-hud">blink: 0 | talk: 0 | rate: 0</div>
 </div>
 

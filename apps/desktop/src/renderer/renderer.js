@@ -25,6 +25,10 @@ document.addEventListener('DOMContentLoaded', () => {
   const debugHud = document.getElementById('debug-hud');
   const distractionContainer = document.getElementById('distraction-container');
   const revealMessage = document.getElementById('reveal-message');
+  
+  // Elements for Level 4 Jumpscare
+  const jumpscareOverlay = document.getElementById('jumpscare-overlay');
+  const jumpscareFace = document.getElementById('jumpscare-face');
 
   const mBr = document.getElementById('m-br');
   const mRate = document.getElementById('m-rate');
@@ -34,10 +38,13 @@ document.addEventListener('DOMContentLoaded', () => {
   let rafId = 0;
   let activeMode = 'none';
   let distractionTimeout = null;
+  let jumpscareTimeout = null;
   let currentLevel = 1;
+  let isPostJumpscare = false; // Flag untuk penalti ganda
 
   const F_DURATION_MS        = 30000;
   const F_PENALTY_BLINK      = 4;
+  const F_PENALTY_BLINK_JUMP = 15; // Penalti kilat setelah jumpscare
   const BLINK_COOLDOWN_MS    = 2000;
   const F_PENALTY_TALK       = 8;
   const TALK_SUSTAIN_MS      = 2000;
@@ -78,6 +85,8 @@ document.addEventListener('DOMContentLoaded', () => {
   for (let i = 1; i <= 8; i++) {
     challengeVideoUrls.push(`presage://local/distractions/distraction_${i}.mp4`);
   }
+  
+  const scaryFaces = ['😱', '👹', '💀', '👻', '😈'];
 
   let audioCtx = null;
 
@@ -139,15 +148,43 @@ document.addEventListener('DOMContentLoaded', () => {
     filter.frequency.setValueAtTime(200, audioCtx.currentTime);
     filter.frequency.linearRampToValueAtTime(800, audioCtx.currentTime + 1);
     filter.frequency.linearRampToValueAtTime(200, audioCtx.currentTime + 2);
-    
     const gain = audioCtx.createGain();
     gain.gain.setValueAtTime(0, audioCtx.currentTime);
     gain.gain.linearRampToValueAtTime(0.2, audioCtx.currentTime + 0.5);
     gain.gain.linearRampToValueAtTime(0, audioCtx.currentTime + 2);
-
     noise.connect(filter);
     filter.connect(gain);
     gain.connect(audioCtx.destination);
+    noise.start();
+  }
+
+  function playScream() {
+    if (!audioCtx) return;
+    // Harsh oscillator + noise
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    osc.type = 'sawtooth';
+    osc.frequency.setValueAtTime(800, audioCtx.currentTime);
+    osc.frequency.exponentialRampToValueAtTime(100, audioCtx.currentTime + 0.8);
+    gain.gain.setValueAtTime(0.3, audioCtx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.8);
+    osc.connect(gain);
+    gain.connect(audioCtx.destination);
+    osc.start();
+    osc.stop(audioCtx.currentTime + 0.8);
+
+    // Add noise
+    const bufferSize = audioCtx.sampleRate * 0.8;
+    const buffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
+    const data = buffer.getChannelData(0);
+    for (let i = 0; i < bufferSize; i++) data[i] = Math.random() * 2 - 1;
+    const noise = audioCtx.createBufferSource();
+    noise.buffer = buffer;
+    const noiseGain = audioCtx.createGain();
+    noiseGain.gain.setValueAtTime(0.2, audioCtx.currentTime);
+    noiseGain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.8);
+    noise.connect(noiseGain);
+    noiseGain.connect(audioCtx.destination);
     noise.start();
   }
 
@@ -173,21 +210,43 @@ document.addEventListener('DOMContentLoaded', () => {
     distractionTimeout = setTimeout(triggerDistraction, nextDelay);
   }
 
+  function triggerJumpscare() {
+    if (activeMode !== 'flinch' || currentLevel !== 4) return;
+
+    // Randomize face
+    jumpscareFace.textContent = scaryFaces[Math.floor(Math.random() * scaryFaces.length)];
+    
+    // Play audio
+    playScream();
+
+    // Show visual
+    jumpscareOverlay.classList.add('active');
+
+    // Set post-jumpscare penalty flag
+    isPostJumpscare = true;
+
+    // Clean up after animation
+    setTimeout(() => {
+      jumpscareOverlay.classList.remove('active');
+      isPostJumpscare = false;
+    }, 600);
+
+    // Schedule next jumpscare (random 4-7s)
+    const nextDelay = 4000 + Math.random() * 3000;
+    jumpscareTimeout = setTimeout(triggerJumpscare, nextDelay);
+  }
+
   function playRandomChallengeVideo() {
     if (currentLevel !== 3 || activeMode !== 'flinch' || challengeVideoUrls.length === 0) return;
-    
     const url = challengeVideoUrls[Math.floor(Math.random() * challengeVideoUrls.length)];
     challengeVideo.src = url;
     challengeVideo.play().catch(e => {
-      console.warn('Failed to play challenge video:', e);
       setTimeout(playRandomChallengeVideo, 1000);
     });
   }
 
   challengeVideo.addEventListener('ended', () => {
-    if (activeMode === 'flinch' && currentLevel === 3) {
-      playRandomChallengeVideo();
-    }
+    if (activeMode === 'flinch' && currentLevel === 3) playRandomChallengeVideo();
   });
 
   function show(name) {
@@ -220,7 +279,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   function updateDebugHud() {
     if (debugHud) {
-      debugHud.textContent = `blink: ${f_blinkCount} | talk: ${f_talkCount} | rate: ${f_rateCount} | talkAccum: ${Math.round(f_talkAccumMs/1000)}s`;
+      debugHud.textContent = `blink: ${f_blinkCount} | talk: ${f_talkCount} | rate: ${f_rateCount} | talkAccum: ${Math.round(f_talkAccumMs/1000)}s | post-jump: ${isPostJumpscare}`;
     }
   }
 
@@ -234,7 +293,9 @@ document.addEventListener('DOMContentLoaded', () => {
     window.speechSynthesis.cancel();
     distractionContainer.innerHTML = '';
     clearTimeout(distractionTimeout);
-    
+    clearTimeout(jumpscareTimeout);
+    jumpscareOverlay.classList.remove('active');
+    isPostJumpscare = false;
     revealMessage.style.display = 'none';
 
     gameContainer.classList.remove('level3-mode');
@@ -247,21 +308,18 @@ document.addEventListener('DOMContentLoaded', () => {
       setTimeout(playRandomChallengeVideo, 1000);
     } else {
       bgVideo.style.opacity = '0.2';
-      if (level === 2) {
-        distractionTimeout = setTimeout(triggerDistraction, 3000);
-      }
+      if (level === 2) distractionTimeout = setTimeout(triggerDistraction, 3000);
+      if (level === 4) jumpscareTimeout = setTimeout(triggerJumpscare, 3000);
     }
 
     f_composure = 100;
     f_startTime = performance.now();
     f_lastFrameTime = f_startTime;
-    
     f_lastBlinkState = false;
     f_lastBlinkPenaltyTime = -Infinity;
     f_talkAccumMs = 0;
     f_lastTalkPenaltyTime = -Infinity;
     f_lastRatePenaltyTime = -Infinity;
-
     f_blinkCount = 0;
     f_talkCount = 0;
     f_rateCount = 0;
@@ -284,7 +342,6 @@ document.addEventListener('DOMContentLoaded', () => {
     const elapsed = now - f_startTime;
     const dt = now - f_lastFrameTime;
     f_lastFrameTime = now;
-    
     const tMs = elapsed;
     const timeLeft = Math.max(0, (F_DURATION_MS - elapsed) / 1000);
 
@@ -301,20 +358,18 @@ document.addEventListener('DOMContentLoaded', () => {
     if (s) {
       if (s.blink && !f_lastBlinkState) {
         if (elapsed - f_lastBlinkPenaltyTime >= BLINK_COOLDOWN_MS) {
-          f_composure -= F_PENALTY_BLINK;
+          const penalty = isPostJumpscare ? F_PENALTY_BLINK_JUMP : F_PENALTY_BLINK;
+          f_composure -= penalty;
           f_blinkCount++;
           f_lastBlinkPenaltyTime = elapsed;
           popAlert('FLINCH!');
-          statusText.textContent = 'You blinked!';
+          statusText.textContent = isPostJumpscare ? 'You flinched at the scare!' : 'You blinked!';
         }
       }
       f_lastBlinkState = s.blink;
 
-      if (s.talk) {
-        f_talkAccumMs += dt;
-      } else {
-        f_talkAccumMs = Math.max(0, f_talkAccumMs - (dt * 2));
-      }
+      if (s.talk) f_talkAccumMs += dt;
+      else f_talkAccumMs = Math.max(0, f_talkAccumMs - (dt * 2));
 
       if (f_talkAccumMs >= TALK_SUSTAIN_MS && (elapsed - f_lastTalkPenaltyTime >= TALK_COOLDOWN_MS)) {
         f_composure -= F_PENALTY_TALK;
@@ -325,7 +380,7 @@ document.addEventListener('DOMContentLoaded', () => {
         statusText.textContent = 'Sustained talking detected!';
       }
 
-      if (!s.blink && f_talkAccumMs === 0 && Math.random() < 0.02) {
+      if (!s.blink && f_talkAccumMs === 0 && !isPostJumpscare && Math.random() < 0.02) {
         statusText.textContent = 'Do not flinch.';
       }
     }
@@ -367,11 +422,13 @@ document.addEventListener('DOMContentLoaded', () => {
     activeMode = 'none';
     cancelAnimationFrame(rafId);
     clearTimeout(distractionTimeout);
+    clearTimeout(jumpscareTimeout);
     window.speechSynthesis.cancel();
     
     bgVideo.pause();
     challengeVideo.pause();
     challengeVideo.removeAttribute('src');
+    jumpscareOverlay.classList.remove('active');
 
     document.getElementById('result-icon').textContent = survived ? '🏆' : '💀';
     document.getElementById('result-title').textContent = survived ? 'You survived!' : 'Eliminated';
@@ -379,15 +436,14 @@ document.addEventListener('DOMContentLoaded', () => {
     let modeText = '';
     if (currentLevel === 2) modeText = ' (Seriously?)';
     if (currentLevel === 3) modeText = ' (Why So Serious?)';
+    if (currentLevel === 4) modeText = ' (Don\'t Scream)';
     
     const desc = survived
       ? `Composure: ${Math.round(f_composure)}% · blinks: ${f_blinkCount} · rate: ${f_rateCount}${modeText}`
       : `Final composure: 0% · blinks: ${f_blinkCount} · talks: ${f_talkCount} · rate: ${f_rateCount}${modeText}`;
     document.getElementById('result-desc').textContent = desc;
 
-    if (currentLevel > 1) {
-      revealMessage.style.display = 'block';
-    }
+    if (currentLevel > 1) revealMessage.style.display = 'block';
 
     show('flinchResult');
   }
@@ -396,11 +452,9 @@ document.addEventListener('DOMContentLoaded', () => {
     if (!await loadData()) return;
     activeMode = 'replay';
     show('player');
-
     r_cursor = 0;
     video.currentTime = 0;
     video.play().catch(e => console.error(e));
-
     cancelAnimationFrame(rafId);
     rafId = requestAnimationFrame(replayLoop);
   }
@@ -428,14 +482,14 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('btn-level1').addEventListener('click', () => startFlinch(1));
   document.getElementById('btn-level2').addEventListener('click', () => startFlinch(2));
   document.getElementById('btn-level3').addEventListener('click', () => startFlinch(3));
+  document.getElementById('btn-level4').addEventListener('click', () => startFlinch(4));
   document.getElementById('btn-replay').addEventListener('click', startReplay);
   document.getElementById('btn-flinch-restart').addEventListener('click', () => startFlinch(currentLevel));
   document.getElementById('btn-back').addEventListener('click', () => { show('consent'); });
   
-  // Navigasi Rules
   document.getElementById('btn-rules').addEventListener('click', () => show('rules'));
   document.getElementById('btn-rules-back').addEventListener('click', () => show('consent'));
-  document.getElementById('btn-rules-back-top').addEventListener('click', () => show('consent')); // Tombol back baru di atas
+  document.getElementById('btn-rules-back-top').addEventListener('click', () => show('consent'));
 
   document.getElementById('btn-back-player').addEventListener('click', () => {
     activeMode = 'none';

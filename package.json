@@ -1,0 +1,13 @@
+{
+  "name": "presage-party",
+  "version": "0.0.0",
+  "private": true,
+  "packageManager": "pnpm@12.8.1",
+  "engines": {
+    "node": ">=22.12"
+  },
+  "scripts": {
+    "spike": "pnpm --filter @presage-party/desktop spike",
+    "dev": "pnpm --filter @presage-party/desktop dev"
+  }
+}

@@ -1,0 +1,17 @@
+{
+  "name": "@presage-party/desktop",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "spike": "tsx scripts/spike-file.mts",
+    "dev": "echo 'electron not wired yet — Phase 0b'"
+  },
+  "dependencies": {
+    "@smartspectra/node-sdk": "*"
+  },
+  "devDependencies": {
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.2"
+  }
+}

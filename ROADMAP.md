@@ -152,3 +152,13 @@ is present in the submission.
 
 Any item on the kill-list requires Harsh Judge persona approval before
 reopening. Default answer is no.
+
+## Future Development (Post-Hackathon)
+
+- **Persistent Accounts**: Currently, usernames and scores reset on app close.
+  Future plan: Add an opt-in registration/login system (Firebase or Supabase)
+  so users can save their lifetime stats and appear on a global leaderboard.
+- **Web Version**: Deploy the Electron renderer as a web app (Vercel) with a
+  cloud-hosted Socket.IO server (Render/Railway).
+- **Live Camera**: Integrate actual webcam support when the SDK stabilizes on
+  Windows (currently blocked by TPM/CNG issues).

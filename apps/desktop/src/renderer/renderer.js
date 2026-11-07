@@ -2,6 +2,7 @@
 
 document.addEventListener('DOMContentLoaded', () => {
   const screens = {
+    name: document.getElementById('screen-name'),
     consent: document.getElementById('screen-consent'),
     rules: document.getElementById('screen-rules'),
     flinch: document.getElementById('screen-flinch'),
@@ -57,6 +58,7 @@ document.addEventListener('DOMContentLoaded', () => {
   let currentOnFinish = null;
   let myRoleInRoom = null;
   let socket = null;
+  let myUsername = '';
 
   // Deterministic RNG for Multiplayer
   let currentRng = Math.random;
@@ -408,6 +410,13 @@ document.addEventListener('DOMContentLoaded', () => {
     const title = isTie ? "IT'S A TIE" : (iWon ? 'YOU WIN' : 'YOU LOSE');
     const color = isTie ? '#fbbf24' : (iWon ? '#4ade80' : '#ef4444');
     const tEl = document.getElementById('mp-result-title'); if (tEl) { tEl.textContent = title; tEl.style.color = color; }
+    
+    // Tampilkan nama asli
+    const mineLabel = myRoleInRoom === 'host' ? payload.hostName : payload.guestName;
+    const oppLabel = myRoleInRoom === 'host' ? payload.guestName : payload.hostName;
+    document.querySelector('#mp-result-mine').previousElementSibling.textContent = `${mineLabel} (You)`;
+    document.querySelector('#mp-result-opp').previousElementSibling.textContent = oppLabel;
+
     if (mine) { document.getElementById('mp-result-mine').textContent = mine.score; document.getElementById('mp-result-mine-stats').textContent = `blinks ${mine.blinks} · talks ${mine.talks} · rate ${mine.rateSpikes}`; }
     if (opp) { document.getElementById('mp-result-opp').textContent = opp.score; document.getElementById('mp-result-opp-stats').textContent = `blinks ${opp.blinks} · talks ${opp.talks} · rate ${opp.rateSpikes}`; }
     show('mp-result');
@@ -432,12 +441,12 @@ document.addEventListener('DOMContentLoaded', () => {
     
     socket.on('room_joined', (data) => {
       myRoleInRoom = 'guest';
-      mpStatus.innerHTML = `<span style="color:#4ade80;">Joined room ${data.code}</span><br><span style="color:#aaa;font-size:13px;">(You are a Gamer. Waiting for Room Master...)</span>`;
+      mpStatus.innerHTML = `<span style="color:#4ade80;">Joined ${data.hostName}'s room</span><br><span style="color:#aaa;font-size:13px;">(Waiting for host to start...)</span>`;
       btnCreateRoom.disabled = true; btnJoinRoom.disabled = true;
     });
 
-    socket.on('player_joined', () => {
-      mpStatus.innerHTML = `<span style="color:#4ade80;">Opponent joined!</span> <span style="color:#aaa;font-size:13px;">(You are the Room Master)</span>`;
+    socket.on('player_joined', (data) => {
+      mpStatus.innerHTML = `<span style="color:#4ade80;">${data.name} joined!</span> <span style="color:#aaa;font-size:13px;">(You are the Room Master)</span>`;
       if (btnStartGame) { btnStartGame.disabled = false; btnStartGame.style.display = 'inline-flex'; }
       if (levelSelector) levelSelector.style.display = 'block';
     });
@@ -504,7 +513,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   btnCreateRoom.addEventListener('click', () => {
     const pwd = inputCreatePassword.value.trim();
-    socket.emit('create_room', { password: pwd }, (res) => {
+    socket.emit('create_room', { password: pwd, name: myUsername }, (res) => {
       if (res.success) {
         myRoleInRoom = 'host';
         mpStatus.innerHTML = `Room Code: <span style="font-size:32px; color:#fff;">${res.roomCode}</span>${pwd ? ' (Private)' : ''}<br><span style="font-size:14px; color:#aaa;">Waiting for opponent...</span>`;
@@ -517,7 +526,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const code = inputRoomCode.value.trim().toUpperCase();
     const pwd = inputRoomPassword.value.trim();
     if (!code) return;
-    socket.emit('join_room', { code, password: pwd }, (res) => {
+    socket.emit('join_room', { code, password: pwd, name: myUsername }, (res) => {
       if (!res.success) { mpStatus.textContent = 'Error: ' + res.error; mpStatus.style.color = '#ef4444'; }
     });
   });
@@ -580,3 +589,21 @@ document.addEventListener('DOMContentLoaded', () => {
 
   show('consent');
 });
+
+// SOCIAL SHARE FUNCTION
+window.shareResult = function(platform, score) {
+  const url = 'https://github.com/setuju/Presage-Party';
+  const text = `I just ${score ? 'scored ' + score + ' in' : 'played'} Flinch Royale! Can you beat me? Play now:`;
+  let shareUrl = '';
+  
+  if (platform === 'whatsapp') shareUrl = `https://wa.me/?text=${encodeURIComponent(text + ' ' + url)}`;
+  else if (platform === 'telegram') shareUrl = `https://t.me/share/url?url=${encodeURIComponent(url)}&text=${encodeURIComponent(text)}`;
+  else if (platform === 'twitter') shareUrl = `https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}&url=${encodeURIComponent(url)}`;
+  else if (platform === 'instagram' || platform === 'tiktok') {
+    navigator.clipboard.writeText(text + ' ' + url);
+    alert('Link copied to clipboard! Open Instagram/TikTok and paste it in your story.');
+    return;
+  }
+  
+  window.open(shareUrl, '_blank');
+};

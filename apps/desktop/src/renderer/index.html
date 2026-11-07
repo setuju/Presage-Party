@@ -130,6 +130,16 @@
 </head>
 <body>
 
+<!-- SCREEN: NAME ENTRY -->
+<div id="screen-name" class="screen active">
+  <div class="consent-wrap" style="max-width: 400px; margin-top: 150px; text-align: center;">
+    <h1 style="color:#fff;">Welcome to Flinch Royale</h1>
+    <p style="margin-bottom: 24px;">What should we call you?</p>
+    <input type="text" id="input-username" placeholder="Enter your name..." maxlength="15" style="width: 100%; padding: 14px; border-radius: 8px; border: 1px solid #444; background: #111; color: #fff; font-size: 18px; text-align: center; margin-bottom: 16px;">
+    <button id="btn-save-name" class="btn btn-primary" style="width: 100%;">Continue</button>
+  </div>
+</div>
+
 <!-- SCREEN: CONSENT & MENU -->
 <div id="screen-consent" class="screen active">
   <div class="consent-wrap">
@@ -367,9 +377,20 @@
       * The sounds and texts you experienced were entirely computer-generated for this game.
     </p>
     
-    <div class="actions" style="margin-top:48px;">
+    <div class="actions" style="margin-top:32px;">
       <button id="btn-flinch-restart" class="btn btn-primary">Play Again</button>
       <button id="btn-back" class="btn">Back to Menu</button>
+    </div>
+    
+    <div style="margin-top: 32px; border-top: 1px solid #333; padding-top: 24px;">
+      <p style="font-size: 14px; color: #888; margin-bottom: 12px;">Challenge your friends!</p>
+      <div style="display: flex; gap: 12px; justify-content: center; flex-wrap: wrap;">
+        <button class="btn" style="border-color: #25D366; color: #25D366;" onclick="shareResult('whatsapp')">WhatsApp</button>
+        <button class="btn" style="border-color: #0088cc; color: #0088cc;" onclick="shareResult('telegram')">Telegram</button>
+        <button class="btn" style="border-color: #1DA1F2; color: #1DA1F2;" onclick="shareResult('twitter')">X / Twitter</button>
+        <button class="btn" style="border-color: #E1306C; color: #E1306C;" onclick="shareResult('instagram')">Instagram</button>
+        <button class="btn" style="border-color: #000000; color: #ffffff; background: #333;" onclick="shareResult('tiktok')">TikTok</button>
+      </div>
     </div>
   </div>
 </div>

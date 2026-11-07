@@ -9,7 +9,7 @@ const io = new Server(httpServer, { cors: { origin: '*', methods: ['GET', 'POST'
 app.get('/', (req, res) => res.send('Presage Party Server is running.'));
 
 interface ScoreReport { score: number; blinks: number; talks: number; rateSpikes: number; survived: boolean; }
-interface Room { code: string; host: string; guest: string | null; startAt: number | null; level: number; duration: number; results: { host: ScoreReport | null; guest: ScoreReport | null }; }
+interface Room { code: string; host: string; hostName: string; guest: string | null; guestName: string | null; startAt: number | null; level: number; duration: number; results: { host: ScoreReport | null; guest: ScoreReport | null }; }
 
 const rooms = new Map<string, Room>();
 const socketToRoom = new Map<string, string>();
@@ -38,6 +38,7 @@ io.on('connection', (socket) => {
       if (room.guest) return typeof callback === 'function' && callback({ success: false, error: 'Room full' });
 
       room.guest = socket.id;
+      room.guestName = (data && data.name) ? data.name.trim() : 'Gamer';
       socketToRoom.set(socket.id, code);
       socket.join(code);
       socket.to(code).emit('player_joined', socket.id);
@@ -80,7 +81,7 @@ io.on('connection', (socket) => {
         const hScore = room.results.host.score || 0;
         const gScore = room.results.guest.score || 0;
         const winner = hScore > gScore ? 'host' : gScore > hScore ? 'guest' : 'tie';
-        io.to(code).emit('game_result', { host: room.results.host, guest: room.results.guest, winner });
+        io.to(code).emit('game_result', { host: room.results.host, guest: room.results.guest, winner, hostName: room.hostName, guestName: room.guestName });
         console.log(`[game] room ${code} result: winner=${winner}`);
       }
       if (typeof callback === 'function') callback({ success: true });

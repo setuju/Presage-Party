@@ -7,7 +7,9 @@ document.addEventListener('DOMContentLoaded', () => {
     flinch: document.getElementById('screen-flinch'),
     flinchResult: document.getElementById('screen-flinch-result'),
     player: document.getElementById('screen-player'),
-    multiplayer: document.getElementById('screen-multiplayer')
+    multiplayer: document.getElementById('screen-multiplayer'),
+    'mp-waiting': document.getElementById('screen-mp-waiting'),
+    'mp-result': document.getElementById('screen-mp-result')
   };
 
   const bgVideo = document.getElementById('bg-video');

@@ -243,7 +243,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (debugHud) debugHud.textContent = `blink: ${f_blinkCount} | talk: ${f_talkCount} | rate: ${f_rateCount} | talkAccum: ${Math.round(f_talkAccumMs/1000)}s | post-jump: ${isPostJumpscare}`;
   }
 
-  async function startFlinch(level, onFinish) {
+  async function startFlinch(level, durationSeconds, onFinish) {
     if (!await loadData()) return;
     currentLevel = level;
     currentOnFinish = onFinish || null;
@@ -267,6 +267,7 @@ document.addEventListener('DOMContentLoaded', () => {
       bgVideo.style.opacity = '0.2';
     }
 
+    f_durationMs = (durationSeconds || 30) * 1000;
     f_composure = 100; f_startTime = performance.now(); f_lastFrameTime = f_startTime;
     f_lastBlinkState = false; f_lastBlinkPenaltyTime = -Infinity; f_talkAccumMs = 0; f_lastTalkPenaltyTime = -Infinity; f_lastRatePenaltyTime = -Infinity; f_lastTriggerTick = -1;
     f_blinkCount = 0; f_talkCount = 0; f_rateCount = 0;
@@ -446,7 +447,7 @@ document.addEventListener('DOMContentLoaded', () => {
       mpStatus.style.color = '#fbbf24';
       
       setTimeout(() => {
-        startFlinch(payload.level, (scoreData) => {
+        startFlinch(payload.level, payload.duration || 30, (scoreData) => {
           socket.emit('report_score', scoreData);
           show('mp-waiting');
         });
@@ -476,12 +477,12 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   // BUTTON LISTENERS
-  document.getElementById('btn-level1').addEventListener('click', () => startFlinch(1));
-  document.getElementById('btn-level2').addEventListener('click', () => startFlinch(2));
-  document.getElementById('btn-level3').addEventListener('click', () => startFlinch(3));
-  document.getElementById('btn-level4').addEventListener('click', () => startFlinch(4));
+  document.getElementById('btn-level1').addEventListener('click', () => startFlinch(1, parseInt(document.getElementById('select-solo-duration').value, 10)));
+  document.getElementById('btn-level2').addEventListener('click', () => startFlinch(2, parseInt(document.getElementById('select-solo-duration').value, 10)));
+  document.getElementById('btn-level3').addEventListener('click', () => startFlinch(3, parseInt(document.getElementById('select-solo-duration').value, 10)));
+  document.getElementById('btn-level4').addEventListener('click', () => startFlinch(4, parseInt(document.getElementById('select-solo-duration').value, 10)));
   document.getElementById('btn-replay').addEventListener('click', startReplay);
-  document.getElementById('btn-flinch-restart').addEventListener('click', () => startFlinch(currentLevel));
+  document.getElementById('btn-flinch-restart').addEventListener('click', () => startFlinch(currentLevel, f_durationMs / 1000));
   document.getElementById('btn-back').addEventListener('click', () => show('consent'));
   document.getElementById('btn-rules').addEventListener('click', () => show('rules'));
   document.getElementById('btn-rules-back').addEventListener('click', () => show('consent'));

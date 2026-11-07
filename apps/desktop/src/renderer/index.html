@@ -11,7 +11,17 @@
     .screen { display: none; min-height: 100vh; padding: 32px; }
     .screen.active { display: block; }
     
-    #screen-rules { overflow-y: auto; height: 100vh; padding-bottom: 80px; }
+    /* Semua layar selain game harus bisa di-scroll jika kontennya panjang */
+    #screen-consent.active, #screen-rules.active, #screen-multiplayer.active,
+    #screen-flinch-result.active, #screen-player.active,
+    #screen-mp-waiting.active, #screen-mp-result.active {
+      height: 100vh;
+      overflow-y: auto;
+      padding-bottom: 80px;
+    }
+    
+    /* Game screen spesifik tidak boleh scroll */
+    #screen-flinch.active { overflow: hidden; height: 100vh; padding: 0; }
 
     h1 { font-weight: 600; letter-spacing: -0.03em; margin: 0 0 8px; font-size: 36px; }
     h2 { font-weight: 500; margin: 24px 0 12px; color: #ddd; }
@@ -138,7 +148,16 @@
 
     <p>This build uses <strong>replay mode</strong>. No live camera is accessed.</p>
 
-    <div style="display:flex; gap:12px; margin-top:32px; flex-wrap:wrap;">
+    <div style="margin-top: 24px; margin-bottom: 12px; text-align: left;">
+      <div style="color:#aaa; font-size:14px; margin-bottom:8px;">Solo Duration:</div>
+      <select id="select-solo-duration" style="width:100%; padding:10px; border-radius:6px; background:#222; color:#fff; border:1px solid #444;">
+        <option value="30">30 Seconds (Default)</option>
+        <option value="60">1 Minute</option>
+        <option value="180">3 Minutes (Max)</option>
+      </select>
+    </div>
+
+    <div style="display:flex; gap:12px; margin-top:12px; flex-wrap:wrap;">
       <button id="btn-level1" class="btn btn-primary" style="flex:1;">Chill Mode</button>
       <button id="btn-level2" class="btn btn-level2" style="flex:1;">Seriously?</button>
       <button id="btn-level3" class="btn btn-level3" style="flex:1;">Why So Serious?</button>

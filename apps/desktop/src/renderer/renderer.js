@@ -73,7 +73,7 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   // Tunables & State
-  const F_DURATION_MS = 30000;
+  let f_durationMs = 30000;
   const F_PENALTY_BLINK = 4;
   const F_PENALTY_BLINK_JUMP = 15;
   const BLINK_COOLDOWN_MS = 2000;
@@ -284,9 +284,9 @@ document.addEventListener('DOMContentLoaded', () => {
     const dt = now - f_lastFrameTime;
     f_lastFrameTime = now;
     const tMs = elapsed;
-    const timeLeft = Math.max(0, (F_DURATION_MS - elapsed) / 1000);
+    const timeLeft = Math.max(0, (f_durationMs - elapsed) / 1000);
 
-    if (elapsed >= F_DURATION_MS) { endFlinch(true); return; }
+    if (elapsed >= f_durationMs) { endFlinch(true); return; }
     timerEl.textContent = Math.ceil(timeLeft);
 
     // Deterministic Time-Based Triggers for Multiplayer
@@ -303,7 +303,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const samples = timeline.samples || [];
     let s = null;
-    for (let i = 0; i < samples.length; i++) { if (samples[i].t <= tMs) s = samples[i]; else break; }
+    if (samples.length > 0) {
+      const maxT = samples[samples.length - 1].t;
+      const loopedTMs = (tMs > maxT) ? (tMs % maxT) : tMs;
+      for (let i = 0; i < samples.length; i++) { if (samples[i].t <= loopedTMs) s = samples[i]; else break; }
+    }
 
     if (s) {
       if (s.blink && !f_lastBlinkState) {
@@ -437,6 +441,7 @@ document.addEventListener('DOMContentLoaded', () => {
     socket.on('game_start', (payload) => {
       const delay = Math.max(0, (payload.startAt || Date.now()) - Date.now());
       if (payload.roomCode) currentRng = mulberry32(hashRoomCode(payload.roomCode));
+      f_durationMs = (payload.duration || 30) * 1000;
       mpStatus.textContent = 'Starting in ' + Math.ceil(delay / 1000) + '...';
       mpStatus.style.color = '#fbbf24';
       
@@ -514,7 +519,8 @@ document.addEventListener('DOMContentLoaded', () => {
   if (btnStartGame) {
     btnStartGame.addEventListener('click', () => {
       const level = parseInt(selectLevel.value, 10);
-      socket.emit('start_game', { level }, (res) => {
+      const duration = parseInt(document.getElementById('select-mp-duration').value, 10);
+      socket.emit('start_game', { level, duration }, (res) => {
         if (res.success) { btnStartGame.disabled = true; btnStartGame.style.display = 'none'; levelSelector.style.display = 'none'; mpStatus.textContent = 'Waiting for countdown...'; }
       });
     });

@@ -9,7 +9,7 @@ const io = new Server(httpServer, { cors: { origin: '*', methods: ['GET', 'POST'
 app.get('/', (req, res) => res.send('Presage Party Server is running.'));
 
 interface ScoreReport { score: number; blinks: number; talks: number; rateSpikes: number; survived: boolean; }
-interface Room { code: string; host: string; guest: string | null; startAt: number | null; level: number; results: { host: ScoreReport | null; guest: ScoreReport | null }; }
+interface Room { code: string; host: string; guest: string | null; startAt: number | null; level: number; duration: number; results: { host: ScoreReport | null; guest: ScoreReport | null }; }
 
 const rooms = new Map<string, Room>();
 const socketToRoom = new Map<string, string>();
@@ -23,7 +23,7 @@ io.on('connection', (socket) => {
   socket.on('create_room', (callback) => {
     try {
       const code = Math.random().toString(36).substring(2, 6).toUpperCase();
-      rooms.set(code, { code, host: socket.id, guest: null, startAt: null, level: 1, results: { host: null, guest: null } });
+      rooms.set(code, { code, host: socket.id, guest: null, startAt: null, level: 1, duration: 30, results: { host: null, guest: null } });
       socketToRoom.set(socket.id, code);
       socket.join(code);
       console.log(`Room created: ${code} by ${socket.id}`);
@@ -56,10 +56,11 @@ io.on('connection', (socket) => {
       if (!room.guest) return typeof callback === 'function' && callback({ success: false, error: 'No opponent yet' });
 
       room.level = (data && data.level) || 1;
+      room.duration = (data && data.duration) || 30;
       room.startAt = Date.now() + 3000;
       room.results = { host: null, guest: null };
       
-      io.to(code).emit('game_start', { startAt: room.startAt, level: room.level, roomCode: code });
+      io.to(code).emit('game_start', { startAt: room.startAt, level: room.level, duration: room.duration, roomCode: code });
       console.log(`[game] room ${code} starting at ${room.startAt} level ${room.level}`);
       if (typeof callback === 'function') callback({ success: true });
     } catch (e) { console.error(e); if (typeof callback === 'function') callback({ success: false }); }

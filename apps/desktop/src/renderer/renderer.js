@@ -1,7 +1,6 @@
 'use strict';
 
 (function () {
-  // --- Elements ---
   const screens = {
     consent: document.getElementById('screen-consent'),
     flinch: document.getElementById('screen-flinch'),
@@ -14,7 +13,7 @@
   let timeline = null;
   let videoUrl = null;
 
-  // Flinch elements
+  // UI elements
   const composureBar = document.getElementById('composure-bar');
   const composureLabel = document.getElementById('composure-label');
   const timerEl = document.getElementById('timer');
@@ -22,43 +21,49 @@
   const alertFlinch = document.getElementById('alert-flinch');
   const debugHud = document.getElementById('debug-hud');
 
-  // Replay elements
   const mBr = document.getElementById('m-br');
   const mRate = document.getElementById('m-rate');
   const mBlink = document.getElementById('m-blink');
   const mTalk = document.getElementById('m-talk');
 
-  // --- State ---
   let rafId = 0;
   let activeMode = 'none';
 
-  // Flinch tunables — tuned after first playtest
+  // --- Tunables (survivable by default) ---
   const F_DURATION_MS        = 30000;
-  const F_PENALTY_BLINK      = 6;     // was 15, too harsh
-  const BLINK_COOLDOWN_MS    = 2000;  // no double-penalty on rapid blinks
-  const F_PENALTY_TALK       = 10;
-  const TALK_SUSTAIN_SAMPLES = 20;    // ~2s of continuous talk=true
-  const F_RATE_THRESHOLD     = 22;
-  const F_RATE_PENALTY_TICK  = 1000;  // -2 per second above threshold
-  const F_RATE_PENALTY       = 2;
+  
+  const F_PENALTY_BLINK      = 4;      // -4 per blink (max ~6 blinks/30s = -24)
+  const BLINK_COOLDOWN_MS    = 2000;
 
-  // Flinch runtime state
+  const F_PENALTY_TALK       = 8;      // -8 per sustained talk event
+  const TALK_SUSTAIN_MS      = 2000;   // must talk continuously for 2s to trigger
+  const TALK_COOLDOWN_MS     = 4000;   // 4s cooldown after a talk penalty
+
+  const F_RATE_THRESHOLD     = 24;     // raised from 22, normal talking breathes faster
+  const F_RATE_PENALTY_TICK  = 1000;   // -1 per second above 24 bpm
+  const F_RATE_PENALTY       = 1;
+
+  // Flinch State
   let f_composure = 100;
   let f_startTime = 0;
-  let f_lastBlink = false;
-  let f_lastTalk = false;
-  let f_talkStreak = 0;
-  let f_talkFired = false;
-  let f_lastBlinkPenaltyElapsed = -Infinity;
-  let f_lastRatePenaltyElapsed = -Infinity;
+  let f_lastFrameTime = 0;
+  
+  let f_lastBlinkState = false;
+  let f_lastBlinkPenaltyTime = -Infinity;
+  
+  let f_talkAccumMs = 0;
+  let f_lastTalkPenaltyTime = -Infinity;
+
+  let f_lastRatePenaltyTime = -Infinity;
+
+  // Debug counters
   let f_blinkCount = 0;
   let f_talkCount = 0;
   let f_rateCount = 0;
 
-  // Replay state
+  // Replay State
   let r_cursor = 0;
 
-  // --- Helpers ---
   function show(name) {
     Object.keys(screens).forEach(k => screens[k].classList.toggle('active', k === name));
   }
@@ -89,8 +94,7 @@
 
   function updateDebugHud() {
     if (debugHud) {
-      debugHud.textContent =
-        `blink: ${f_blinkCount} | talk: ${f_talkCount} | rate: ${f_rateCount} | talk-streak: ${f_talkStreak}`;
+      debugHud.textContent = `blink: ${f_blinkCount} | talk: ${f_talkCount} | rate: ${f_rateCount} | talkAccum: ${Math.round(f_talkAccumMs/1000)}s`;
     }
   }
 
@@ -101,16 +105,19 @@
     show('flinch');
 
     f_composure = 100;
-    f_lastBlink = false;
-    f_lastTalk = false;
-    f_talkStreak = 0;
-    f_talkFired = false;
-    f_lastBlinkPenaltyElapsed = -Infinity;
-    f_lastRatePenaltyElapsed = -Infinity;
+    f_startTime = performance.now();
+    f_lastFrameTime = f_startTime;
+    
+    f_lastBlinkState = false;
+    f_lastBlinkPenaltyTime = -Infinity;
+    f_talkAccumMs = 0;
+    f_lastTalkPenaltyTime = -Infinity;
+    f_lastRatePenaltyTime = -Infinity;
+
     f_blinkCount = 0;
     f_talkCount = 0;
     f_rateCount = 0;
-    f_startTime = performance.now();
+
     updateFlinchUI();
     updateDebugHud();
 
@@ -125,6 +132,9 @@
     if (activeMode !== 'flinch') return;
 
     const elapsed = now - f_startTime;
+    const dt = now - f_lastFrameTime;
+    f_lastFrameTime = now;
+    
     const tMs = elapsed;
     const timeLeft = Math.max(0, (F_DURATION_MS - elapsed) / 1000);
 
@@ -141,35 +151,35 @@
 
     if (s) {
       // --- Blink (edge + cooldown) ---
-      if (s.blink && !f_lastBlink) {
-        if (elapsed - f_lastBlinkPenaltyElapsed >= BLINK_COOLDOWN_MS) {
+      if (s.blink && !f_lastBlinkState) {
+        if (elapsed - f_lastBlinkPenaltyTime >= BLINK_COOLDOWN_MS) {
           f_composure -= F_PENALTY_BLINK;
           f_blinkCount++;
-          f_lastBlinkPenaltyElapsed = elapsed;
+          f_lastBlinkPenaltyTime = elapsed;
           popAlert('FLINCH!');
           statusText.textContent = 'You blinked!';
         }
       }
-      f_lastBlink = s.blink;
+      f_lastBlinkState = s.blink;
 
-      // --- Talking (sustained) ---
+      // --- Talking (time-based accumulation) ---
       if (s.talk) {
-        f_talkStreak++;
+        f_talkAccumMs += dt;
       } else {
-        f_talkStreak = 0;
-        f_talkFired = false;
+        f_talkAccumMs = Math.max(0, f_talkAccumMs - (dt * 2)); // decays twice as fast
       }
-      if (f_talkStreak >= TALK_SUSTAIN_SAMPLES && !f_talkFired) {
+
+      if (f_talkAccumMs >= TALK_SUSTAIN_MS && (elapsed - f_lastTalkPenaltyTime >= TALK_COOLDOWN_MS)) {
         f_composure -= F_PENALTY_TALK;
         f_talkCount++;
-        f_talkFired = true;
+        f_lastTalkPenaltyTime = elapsed;
+        f_talkAccumMs = 0; // reset
         popAlert('TALKING!');
-        statusText.textContent = 'Sustained talking detected';
+        statusText.textContent = 'Sustained talking detected!';
       }
-      f_lastTalk = s.talk;
 
-      // Idle reset text
-      if (!s.blink && f_talkStreak === 0 && Math.random() < 0.02) {
+      // Reset text
+      if (!s.blink && f_talkAccumMs === 0 && Math.random() < 0.02) {
         statusText.textContent = 'Do not flinch.';
       }
     }
@@ -177,11 +187,11 @@
     // --- Rate (per-second penalty) ---
     const rate = findRate(tMs);
     if (rate && rate.value > F_RATE_THRESHOLD) {
-      if (elapsed - f_lastRatePenaltyElapsed >= F_RATE_PENALTY_TICK) {
+      if (elapsed - f_lastRatePenaltyTime >= F_RATE_PENALTY_TICK) {
         f_composure -= F_RATE_PENALTY;
         f_rateCount++;
-        f_lastRatePenaltyElapsed = elapsed;
-        statusText.textContent = 'Heart rate too high!';
+        f_lastRatePenaltyTime = elapsed;
+        statusText.textContent = `Heart rate too high (${rate.value.toFixed(1)})!`;
       }
     }
 
@@ -215,9 +225,10 @@
 
     document.getElementById('result-icon').textContent = survived ? '🏆' : '💀';
     document.getElementById('result-title').textContent = survived ? 'You survived!' : 'Eliminated';
+    
     const desc = survived
-      ? `Composure remaining: ${Math.round(f_composure)}% · blinks: ${f_blinkCount} · rate spikes: ${f_rateCount}`
-      : `Final composure: 0% · blinks: ${f_blinkCount} · talks: ${f_talkCount} · rate spikes: ${f_rateCount}`;
+      ? `Composure remaining: ${Math.round(f_composure)}% · blinks: ${f_blinkCount} · rate: ${f_rateCount}`
+      : `Final composure: 0% · blinks: ${f_blinkCount} · talks: ${f_talkCount} · rate: ${f_rateCount}`;
     document.getElementById('result-desc').textContent = desc;
 
     show('flinchResult');

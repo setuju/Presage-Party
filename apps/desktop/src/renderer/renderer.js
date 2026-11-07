@@ -1,145 +1,247 @@
 'use strict';
 
 (function () {
+  // --- Elements ---
   const screens = {
     consent: document.getElementById('screen-consent'),
-    player:  document.getElementById('screen-player'),
-    stopped: document.getElementById('screen-stopped'),
+    flinch: document.getElementById('screen-flinch'),
+    flinchResult: document.getElementById('screen-flinch-result'),
+    player: document.getElementById('screen-player')
   };
-  const video   = document.getElementById('video');
-  const timeEl  = document.getElementById('time');
-  const mBr     = document.getElementById('m-br');
-  const mRate   = document.getElementById('m-rate');
-  const mBlink  = document.getElementById('m-blink');
-  const mTalk   = document.getElementById('m-talk');
-  const mStable = document.getElementById('m-stable');
-
+  
+  // Shared
+  const bgVideo = document.getElementById('bg-video');
+  const video = document.getElementById('video');
   let timeline = null;
   let videoUrl = null;
-  let cursor = 0;
-  let rafId = 0;
 
+  // Flinch Elements
+  const composureBar = document.getElementById('composure-bar');
+  const composureLabel = document.getElementById('composure-label');
+  const timerEl = document.getElementById('timer');
+  const statusText = document.getElementById('status-text');
+  const alertFlinch = document.getElementById('alert-flinch');
+
+  // Replay Elements
+  const mBr = document.getElementById('m-br');
+  const mRate = document.getElementById('m-rate');
+  const mBlink = document.getElementById('m-blink');
+  const mTalk = document.getElementById('m-talk');
+
+  // --- State ---
+  let rafId = 0;
+  let activeMode = 'none'; // 'flinch' | 'replay'
+  
+  // Flinch State
+  let f_composure = 100;
+  let f_startTime = 0;
+  let f_lastBlink = false;
+  let f_lastTalk = false;
+  let f_lastRatePenalty = 0;
+  const F_DURATION_MS = 30000;
+  const F_PENALTY_BLINK = 15;
+  const F_PENALTY_TALK = 8;
+  const F_RATE_THRESHOLD = 22;
+
+  // Replay State
+  let r_cursor = 0;
+
+  // --- Helpers ---
   function show(name) {
-    Object.keys(screens).forEach((k) => screens[k].classList.toggle('active', k === name));
+    Object.keys(screens).forEach(k => screens[k].classList.toggle('active', k === name));
+  }
+
+  async function loadData() {
+    if (!timeline) {
+      const res = await window.presage.getTimeline();
+      if (res && res.error) { alert('Timeline error: ' + res.error); return false; }
+      timeline = res;
+    }
+    if (!videoUrl) {
+      videoUrl = await window.presage.getVideoUrl();
+      bgVideo.src = videoUrl;
+      video.src = videoUrl;
+    }
+    return true;
   }
 
   function findRate(tMs) {
     if (!timeline || !timeline.rates) return null;
-    const rates = timeline.rates;
     let best = null;
-    for (let i = 0; i < rates.length; i++) {
-      if (rates[i].t <= tMs) best = rates[i];
+    for (const r of timeline.rates) {
+      if (r.t <= tMs) best = r;
       else break;
     }
     return best;
   }
 
-  function renderFrame() {
-    if (!timeline) return;
+  // --- FLINCH GAME LOGIC ---
+  async function startFlinch() {
+    if (!await loadData()) return;
+    activeMode = 'flinch';
+    show('flinch');
+    
+    f_composure = 100;
+    f_lastBlink = false;
+    f_lastTalk = false;
+    f_startTime = performance.now();
+    updateFlinchUI();
+    
+    bgVideo.currentTime = 0;
+    bgVideo.play().catch(e => console.error(e));
+    
+    cancelAnimationFrame(rafId);
+    rafId = requestAnimationFrame(flinchLoop);
+  }
+
+  function flinchLoop(now) {
+    if (activeMode !== 'flinch') return;
+    
+    const elapsed = now - f_startTime;
+    const tMs = elapsed; // Sync game time with video metric time (0-30s)
+    const timeLeft = Math.max(0, (F_DURATION_MS - elapsed) / 1000);
+    
+    // End game
+    if (elapsed >= F_DURATION_MS) {
+      endFlinch(true);
+      return;
+    }
+    
+    timerEl.textContent = Math.ceil(timeLeft);
+
+    // Get nearest sample
+    const samples = timeline.samples || [];
+    let s = null;
+    // Linear search for the current tMs
+    for (let i = 0; i < samples.length; i++) {
+      if (samples[i].t <= tMs) s = samples[i];
+      else break;
+    }
+
+    if (s) {
+      // Check Blink
+      if (s.blink && !f_lastBlink) {
+        f_composure -= F_PENALTY_BLINK;
+        popAlert('FLINCH!');
+        statusText.textContent = "You blinked!";
+      }
+      f_lastBlink = s.blink;
+
+      // Check Talk
+      if (s.talk && !f_lastTalk) {
+        f_composure -= F_PENALTY_TALK;
+        popAlert('TALKING!');
+        statusText.textContent = "You talked!";
+      }
+      f_lastTalk = s.talk;
+      
+      // Clear status text if no recent penalty
+      if (!s.blink && !s.talk && Math.random() < 0.05) statusText.textContent = "Do not flinch.";
+    }
+
+    // Check Rate Penalty (every 1 sec)
+    const rate = findRate(tMs);
+    if (rate && rate.value > F_RATE_THRESHOLD) {
+      if (elapsed - f_lastRatePenalty > 1000) {
+        f_composure -= 2;
+        f_lastRatePenalty = elapsed;
+        statusText.textContent = "Heart rate too high!";
+      }
+    }
+
+    // UI updates
+    updateFlinchUI();
+
+    // Check Death
+    if (f_composure <= 0) {
+      endFlinch(false);
+      return;
+    }
+
+    rafId = requestAnimationFrame(flinchLoop);
+  }
+
+  function updateFlinchUI() {
+    f_composure = Math.max(0, f_composure);
+    composureBar.style.width = f_composure + '%';
+    composureLabel.textContent = `COMPOSURE ${Math.round(f_composure)}%`;
+    
+    if (f_composure > 60) composureBar.style.backgroundColor = '#4ade80';
+    else if (f_composure > 30) composureBar.style.backgroundColor = '#fbbf24';
+    else composureBar.style.backgroundColor = '#ef4444';
+  }
+
+  function popAlert(text) {
+    alertFlinch.textContent = text;
+    alertFlinch.classList.remove('pop');
+    void alertFlinch.offsetWidth; // trigger reflow
+    alertFlinch.classList.add('pop');
+  }
+
+  function endFlinch(survived) {
+    activeMode = 'none';
+    cancelAnimationFrame(rafId);
+    bgVideo.pause();
+    
+    const icon = survived ? '🏆' : '💀';
+    const title = survived ? 'You survived!' : 'Eliminated';
+    const desc = survived ? `Composure remaining: ${Math.round(f_composure)}%` : 'You flinched too hard.';
+    
+    document.getElementById('result-icon').textContent = icon;
+    document.getElementById('result-title').textContent = title;
+    document.getElementById('result-desc').textContent = desc;
+    
+    show('flinchResult');
+  }
+
+  // --- REPLAY LOGIC (Phase 1c) ---
+  async function startReplay() {
+    if (!await loadData()) return;
+    activeMode = 'replay';
+    show('player');
+    
+    r_cursor = 0;
+    video.currentTime = 0;
+    video.play().catch(e => console.error(e));
+    
+    cancelAnimationFrame(rafId);
+    rafId = requestAnimationFrame(replayLoop);
+  }
+
+  function replayLoop() {
+    if (activeMode !== 'replay') return;
+    if (video.paused || video.ended) return;
+
     const tMs = Math.round(video.currentTime * 1000);
     const samples = timeline.samples || [];
 
-    // Advance cursor, tolerate duplicate t values
-    while (cursor + 1 < samples.length && samples[cursor + 1].t <= tMs) cursor++;
-
-    const s = samples[cursor];
+    while (r_cursor + 1 < samples.length && samples[r_cursor + 1].t <= tMs) r_cursor++;
+    const s = samples[r_cursor];
+    
     if (s) {
-      mBr.textContent = s.br.toFixed(4);
+      mBr.textContent = s.br.toFixed(2);
       mBlink.textContent = s.blink ? 'yes' : 'no';
-      mBlink.className = 'v' + (s.blink ? ' warn' : '');
       mTalk.textContent = s.talk ? 'yes' : 'no';
-      mTalk.className = 'v' + (s.talk ? ' warn' : '');
     }
-
     const r = findRate(tMs);
-    if (r) {
-      mRate.textContent = r.value.toFixed(1) + ' bpm';
-      if (typeof r.confidence === 'number') mRate.textContent += ' (' + r.confidence.toFixed(0) + '%)';
-      mStable.textContent = r.stable ? 'yes' : 'no';
-      mStable.className = 'v' + (r.stable ? '' : ' warn');
-    }
+    if (r) mRate.textContent = r.value.toFixed(1) + ' bpm';
 
-    timeEl.textContent = video.currentTime.toFixed(1) + ' / ' + (video.duration || 0).toFixed(1) + ' s';
-
-    if (!video.paused && !video.ended) rafId = requestAnimationFrame(renderFrame);
+    rafId = requestAnimationFrame(replayLoop);
   }
 
-  function resetMetrics() {
-    mBr.textContent = '—';
-    mRate.textContent = '—';
-    mBlink.textContent = '—';
-    mTalk.textContent = '—';
-    mStable.textContent = '—';
-    timeEl.textContent = '0.0 / 0.0 s';
-    [mBr, mRate, mBlink, mTalk, mStable].forEach(el => { el.className = 'v'; });
-  }
-
-  async function startPlayback() {
-    show('player');
-    resetMetrics();
-    cursor = 0;
-
-    if (!timeline) {
-      const result = await window.presage.getTimeline();
-      if (result && result.error) {
-        alert('Timeline load error: ' + result.error);
-        show('consent');
-        return;
-      }
-      timeline = result;
-    }
-    if (!videoUrl) {
-      videoUrl = await window.presage.getVideoUrl();
-      video.src = videoUrl;
-    } else if (video.src !== videoUrl) {
-      video.src = videoUrl;
-    }
-
-    try {
-      video.currentTime = 0;
-      await video.play();
-    } catch (err) {
-      alert('Video play error: ' + err.message);
-      show('consent');
-      return;
-    }
-    cancelAnimationFrame(rafId);
-    rafId = requestAnimationFrame(renderFrame);
-  }
-
-  function stopAndDelete() {
-    cancelAnimationFrame(rafId);
+  // --- NAVIGATION EVENTS ---
+  document.getElementById('btn-flinch').addEventListener('click', startFlinch);
+  document.getElementById('btn-replay').addEventListener('click', startReplay);
+  
+  document.getElementById('btn-flinch-restart').addEventListener('click', startFlinch);
+  
+  document.getElementById('btn-back').addEventListener('click', () => { show('consent'); });
+  document.getElementById('btn-back-player').addEventListener('click', () => { 
+    activeMode = 'none';
     video.pause();
-    video.removeAttribute('src');
-    video.load();
-    resetMetrics();
-    cursor = 0;
-    show('stopped');
-  }
-
-  function restart() {
-    show('consent');
-    resetMetrics();
-  }
-
-  document.getElementById('btn-allow').addEventListener('click', startPlayback);
-  document.getElementById('btn-cancel').addEventListener('click', () => {
-    show('consent');
-  });
-  document.getElementById('btn-stop').addEventListener('click', stopAndDelete);
-  document.getElementById('btn-restart').addEventListener('click', restart);
-
-  video.addEventListener('play', () => {
-    cancelAnimationFrame(rafId);
-    rafId = requestAnimationFrame(renderFrame);
-  });
-  video.addEventListener('pause', () => {
-    cancelAnimationFrame(rafId);
-  });
-  video.addEventListener('ended', () => {
-    cancelAnimationFrame(rafId);
-    show('stopped');
+    show('consent'); 
   });
 
+  // Init
   show('consent');
 })();

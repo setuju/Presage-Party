@@ -555,6 +555,7 @@ document.addEventListener('DOMContentLoaded', () => {
           return;
         }
         const res = await window.presage.checkAssets();
+        console.log('[ui] checkAssets result:', res);
         if (res.ready) {
           assetsReady = true;
           assetStatus.textContent = '✓ Game materials ready.';
@@ -562,7 +563,7 @@ document.addEventListener('DOMContentLoaded', () => {
           if (socket && socket.connected) socket.emit('assets_ready');
         } else {
           assetsReady = false;
-          assetStatus.textContent = `Missing ${res.missing} video(s). Level 3 is disabled.`;
+          assetStatus.textContent = `Missing ${res.missing} video(s) in: ${res.dir}`;
           assetStatus.style.color = '#fbbf24';
         }
       } catch (err) {

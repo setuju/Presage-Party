@@ -82,11 +82,21 @@ app.whenReady().then(() => {
   ipcMain.handle('get-video-url', () => VIDEO_URL);
   ipcMain.handle('check-assets', () => {
     const distDir = join(FIXTURES_DIR, 'distractions');
+    console.log('[check-assets] Looking for videos in:', distDir);
+    
     let missing = 0;
+    const found = [];
     for (let i = 1; i <= 8; i++) {
-      if (!existsSync(join(distDir, `distraction_${i}.mp4`))) missing++;
+      const filePath = join(distDir, `distraction_${i}.mp4`);
+      if (existsSync(filePath)) {
+        found.push(filePath);
+      } else {
+        missing++;
+        console.warn('[check-assets] Missing:', filePath);
+      }
     }
-    return { ready: missing === 0, missing };
+    console.log(`[check-assets] Found ${8 - missing}/8 videos. Ready: ${missing === 0}`);
+    return { ready: missing === 0, missing, dir: distDir, found };
   });
 
   createWindow();

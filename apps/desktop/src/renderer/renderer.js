@@ -529,8 +529,12 @@ document.addEventListener('DOMContentLoaded', () => {
       btnJoinRoom.disabled = false;
     });
 
-    socket.on('connect_error', () => {
-      mpStatus.textContent = 'Server offline. Start the server first.';
+    socket.on('connect_error', (err) => {
+      const msg = err && (err.message || err.description || String(err));
+      const data = err && err.data ? ' data=' + JSON.stringify(err.data) : '';
+      const ctx  = err && err.context ? ' ctx=' + err.context : '';
+      console.error('[socket] connect_error:', msg, data, ctx, err);
+      mpStatus.innerHTML = 'Cannot reach server. <span style="color:#666;font-size:12px;display:block;margin-top:6px;">' + (msg || 'unknown') + data + ctx + '</span>';
       mpStatus.style.color = '#ef4444';
       btnCreateRoom.disabled = true;
       btnJoinRoom.disabled = true;

@@ -16,15 +16,17 @@
     ul { color: #aaa; padding-left: 20px; margin: 8px 0; font-size: 15px; }
     li { margin: 6px 0; }
     
-    .btn { display: inline-flex; align-items: center; justify-content: center; padding: 14px 28px; border: 1px solid #444; background: #1a1a1a; color: #eee;
-           font-size: 16px; border-radius: 8px; cursor: pointer; margin-right: 16px; margin-bottom: 12px; transition: all 0.2s; font-weight: 500; }
+    .btn { display: inline-flex; align-items: center; justify-content: center; padding: 14px 24px; border: 1px solid #444; background: #1a1a1a; color: #eee;
+           font-size: 16px; border-radius: 8px; cursor: pointer; margin-right: 12px; margin-bottom: 12px; transition: all 0.2s; font-weight: 500; }
     .btn:hover { background: #2a2a2a; border-color: #666; transform: translateY(-1px); }
     .btn-primary { background: #4ade80; color: #0a0a0a; border-color: #4ade80; }
     .btn-primary:hover { background: #22c55e; border-color: #22c55e; box-shadow: 0 4px 12px rgba(74, 222, 128, 0.3); }
     .btn-danger { border-color: #ef4444; color: #ef4444; }
     .btn-danger:hover { background: #2a1a1a; border-color: #ef4444; }
-    .btn-hard { border-color: #fbbf24; color: #fbbf24; }
-    .btn-hard:hover { background: #2a2a1a; border-color: #fbbf24; box-shadow: 0 4px 12px rgba(251, 191, 36, 0.2); }
+    .btn-level2 { border-color: #fbbf24; color: #fbbf24; }
+    .btn-level2:hover { background: #2a2a1a; border-color: #fbbf24; box-shadow: 0 4px 12px rgba(251, 191, 36, 0.2); }
+    .btn-level3 { border-color: #f87171; color: #f87171; }
+    .btn-level3:hover { background: #2a1a1a; border-color: #f87171; box-shadow: 0 4px 12px rgba(248, 113, 113, 0.2); }
     
     .consent-wrap { max-width: 680px; background: #111; padding: 40px; border-radius: 12px; border: 1px solid #222; box-shadow: 0 10px 40px rgba(0,0,0,0.5); margin: 40px auto; }
     .privacy { background: #181818; border: 1px solid #333; padding: 20px; border-radius: 8px; margin: 24px 0; }
@@ -64,6 +66,9 @@
         80% { opacity: 0.8; transform: translateY(-40px) scale(1) rotate(-1deg); }
         100% { opacity: 0; transform: translateY(-80px) scale(0.9); }
     }
+    
+    /* Video Challenge (Level 3) */
+    #distraction-video { position: absolute; top: 10%; left: 10%; width: 320px; height: auto; z-index: 15; border: 3px solid #fff; border-radius: 12px; box-shadow: 0 10px 40px rgba(0,0,0,0.9); display: none; object-fit: cover; }
 
     .center { text-align: center; padding-top: 80px; }
     .result-icon { font-size: 100px; margin-bottom: 24px; filter: drop-shadow(0 10px 20px rgba(0,0,0,0.5)); }
@@ -95,8 +100,9 @@
     <p>This build uses <strong>replay mode</strong>. No live camera is accessed.</p>
 
     <div style="display:flex; gap:16px; margin-top:32px; flex-wrap:wrap;">
-      <button id="btn-normal" class="btn btn-primary" style="flex:1;">Play Normal</button>
-      <button id="btn-hard" class="btn btn-hard" style="flex:1;">Play Hard Mode</button>
+      <button id="btn-level1" class="btn btn-primary" style="flex:1;">Level 1 (Normal)</button>
+      <button id="btn-level2" class="btn btn-level2" style="flex:1;">Level 2 (Distractions)</button>
+      <button id="btn-level3" class="btn btn-level3" style="flex:1;">Level 3 (Try Me)</button>
       <button id="btn-replay" class="btn" style="width:100%;">Metrics Replay (Dev)</button>
     </div>
   </div>
@@ -105,6 +111,7 @@
 <!-- SCREEN: FLINCH GAME -->
 <div id="screen-flinch" class="screen">
   <video id="bg-video" playsinline muted></video>
+  <video id="distraction-video" playsinline muted></video>
   <div id="distraction-container"></div>
   <div class="alert-flinch" id="alert-flinch">FLINCH!</div>
   

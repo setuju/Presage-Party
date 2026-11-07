@@ -10,6 +10,7 @@
 
   const bgVideo = document.getElementById('bg-video');
   const video = document.getElementById('video');
+  const distractionVideo = document.getElementById('distraction-video');
   let timeline = null;
   let videoUrl = null;
 
@@ -30,9 +31,9 @@
   let rafId = 0;
   let activeMode = 'none';
   let distractionTimeout = null;
-  let isHardMode = false;
+  let currentLevel = 1;
 
-  // --- Tunables ---
+  // Tunables
   const F_DURATION_MS        = 30000;
   const F_PENALTY_BLINK      = 4;
   const BLINK_COOLDOWN_MS    = 2000;
@@ -43,7 +44,6 @@
   const F_RATE_PENALTY_TICK  = 1000;
   const F_RATE_PENALTY       = 1;
 
-  // Flinch State
   let f_composure = 100;
   let f_startTime = 0;
   let f_lastFrameTime = 0;
@@ -53,26 +53,30 @@
   let f_lastTalkPenaltyTime = -Infinity;
   let f_lastRatePenaltyTime = -Infinity;
 
-  // Debug counters
   let f_blinkCount = 0;
   let f_talkCount = 0;
   let f_rateCount = 0;
 
-  // Replay State
   let r_cursor = 0;
 
-  // --- Audio/Visual Distractions ---
+  // --- Distraction Lists ---
   const distractions = [
-    { type: 'speech', text: 'Hey you, I am here', lang: 'en-US' },
-    { type: 'speech', text: 'You dropped your money on the floor', lang: 'en-US' },
-    { type: 'speech', text: 'Does somebody see my cat?', lang: 'en-US' },
-    { type: 'speech', text: 'Hey, I know you', lang: 'en-US' },
-    { type: 'speech', text: 'I love you', lang: 'en-US' },
-    { type: 'speech', text: 'Je t\'aime', lang: 'fr-FR' },
+    { type: 'speech', text: 'Is that a pimple on your nose?', lang: 'en-US' },
+    { type: 'speech', text: 'Your fly is down.', lang: 'en-US' },
+    { type: 'speech', text: 'Did you hear that sound?', lang: 'en-US' },
+    { type: 'speech', text: 'Look behind you.', lang: 'en-US' },
+    { type: 'speech', text: 'You have something on your face.', lang: 'en-US' },
+    { type: 'speech', text: 'I am watching you.', lang: 'en-US' },
+    { type: 'speech', text: 'Are you nervous?', lang: 'en-US' },
+    { type: 'speech', text: 'Don\\'t blink. I dare you.', lang: 'en-US' },
     { type: 'ringtone', text: 'Brrring! Brrring!' },
-    { type: 'car', text: 'Vroooom!' },
-    { type: 'speech', text: '(Loud laughter)', lang: 'en-US' } // Web speech can't laugh, but it will read this weirdly which is funny
+    { type: 'car', text: 'Vroooom!' }
   ];
+  
+  const distractionVideoUrls = [];
+  for (let i = 1; i <= 8; i++) {
+    distractionVideoUrls.push(`presage://local/distractions/distraction_${i}.mp4`);
+  }
 
   let audioCtx = null;
 
@@ -87,7 +91,6 @@
       const utter = new SpeechSynthesisUtterance(text);
       utter.lang = lang;
       utter.rate = 1.1;
-      utter.pitch = lang === 'fr-FR' ? 1.2 : 1.0;
       window.speechSynthesis.speak(utter);
     }
   }
@@ -97,7 +100,7 @@
     const osc = audioCtx.createOscillator();
     const gain = audioCtx.createGain();
     osc.type = 'sine';
-    osc.frequency.setValueAtTime(880, audioCtx.currentTime); // A5
+    osc.frequency.setValueAtTime(880, audioCtx.currentTime);
     gain.gain.setValueAtTime(0.1, audioCtx.currentTime);
     gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.5);
     osc.connect(gain);
@@ -105,7 +108,6 @@
     osc.start();
     osc.stop(audioCtx.currentTime + 0.5);
     
-    // Second ring after 0.6s
     setTimeout(() => {
       if (!audioCtx) return;
       const osc2 = audioCtx.createOscillator();
@@ -123,11 +125,11 @@
 
   function playCar() {
     if (!audioCtx) return;
-    const bufferSize = audioCtx.sampleRate * 2; // 2 seconds
+    const bufferSize = audioCtx.sampleRate * 2;
     const buffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
     const data = buffer.getChannelData(0);
     for (let i = 0; i < bufferSize; i++) {
-      data[i] = Math.random() * 2 - 1; // white noise
+      data[i] = Math.random() * 2 - 1;
     }
     const noise = audioCtx.createBufferSource();
     noise.buffer = buffer;
@@ -148,36 +150,51 @@
     noise.start();
   }
 
-  function triggerDistraction() {
-    if (activeMode !== 'flinch' || !isHardMode) return;
-
-    // Pick random distraction
-    const d = distractions[Math.floor(Math.random() * distractions.length)];
-
-    // Spawn visual text
-    const el = document.createElement('div');
-    el.className = 'distraction-text';
-    el.textContent = d.text;
-    // Random position
-    el.style.left = (10 + Math.random() * 60) + '%';
-    el.style.top = (20 + Math.random() * 60) + '%';
-    el.style.color = d.type === 'ringtone' ? '#fbbf24' : (d.type === 'car' ? '#f87171' : 'rgba(255,255,255,0.9)');
-    distractionContainer.appendChild(el);
+  function playDistractionVideo() {
+    if (currentLevel !== 3 || distractionVideoUrls.length === 0) return;
+    const url = distractionVideoUrls[Math.floor(Math.random() * distractionVideoUrls.length)];
+    distractionVideo.src = url;
+    distractionVideo.style.display = 'block';
+    distractionVideo.style.left = (5 + Math.random() * 60) + '%';
+    distractionVideo.style.top = (5 + Math.random() * 60) + '%';
     
-    // Cleanup element
-    setTimeout(() => { if (el.parentNode) el.parentNode.removeChild(el); }, 3000);
+    distractionVideo.play().catch(e => {
+      console.warn('Failed to play distraction video:', e);
+      distractionVideo.style.display = 'none';
+    });
 
-    // Play audio
-    if (d.type === 'speech') playSpeech(d.text, d.lang);
-    else if (d.type === 'ringtone') playRingtone();
-    else if (d.type === 'car') playCar();
+    setTimeout(() => {
+      distractionVideo.pause();
+      distractionVideo.style.display = 'none';
+    }, 3000 + Math.random() * 2000);
+  }
 
-    // Schedule next distraction (every 4-7 seconds)
+  function triggerDistraction() {
+    if (activeMode !== 'flinch' || currentLevel === 1) return;
+
+    if (currentLevel === 3 && Math.random() < 0.6) {
+      playDistractionVideo();
+    } else {
+      const d = distractions[Math.floor(Math.random() * distractions.length)];
+      const el = document.createElement('div');
+      el.className = 'distraction-text';
+      el.textContent = d.text;
+      el.style.left = (10 + Math.random() * 60) + '%';
+      el.style.top = (20 + Math.random() * 60) + '%';
+      el.style.color = d.type === 'ringtone' ? '#fbbf24' : (d.type === 'car' ? '#f87171' : 'rgba(255,255,255,0.9)');
+      distractionContainer.appendChild(el);
+      
+      setTimeout(() => { if (el.parentNode) el.parentNode.removeChild(el); }, 3000);
+
+      if (d.type === 'speech') playSpeech(d.text, d.lang);
+      else if (d.type === 'ringtone') playRingtone();
+      else if (d.type === 'car') playCar();
+    }
+
     const nextDelay = 4000 + Math.random() * 3000;
     distractionTimeout = setTimeout(triggerDistraction, nextDelay);
   }
 
-  // --- Helpers ---
   function show(name) {
     Object.keys(screens).forEach(k => screens[k].classList.toggle('active', k === name));
   }
@@ -212,19 +229,20 @@
     }
   }
 
-  // --- FLINCH GAME ---
-  async function startFlinch(hard) {
+  async function startFlinch(level) {
     if (!await loadData()) return;
-    isHardMode = hard;
+    currentLevel = level;
     activeMode = 'flinch';
     show('flinch');
 
     initAudio();
-    window.speechSynthesis.cancel(); // Stop any previous speech
+    window.speechSynthesis.cancel();
     distractionContainer.innerHTML = '';
     clearTimeout(distractionTimeout);
-    if (isHardMode) {
-      distractionTimeout = setTimeout(triggerDistraction, 3000); // First distraction after 3s
+    distractionVideo.style.display = 'none';
+    
+    if (level > 1) {
+      distractionTimeout = setTimeout(triggerDistraction, 3000);
     }
 
     f_composure = 100;
@@ -272,7 +290,6 @@
     }
 
     if (s) {
-      // Blink
       if (s.blink && !f_lastBlinkState) {
         if (elapsed - f_lastBlinkPenaltyTime >= BLINK_COOLDOWN_MS) {
           f_composure -= F_PENALTY_BLINK;
@@ -284,7 +301,6 @@
       }
       f_lastBlinkState = s.blink;
 
-      // Talk
       if (s.talk) {
         f_talkAccumMs += dt;
       } else {
@@ -344,11 +360,16 @@
     clearTimeout(distractionTimeout);
     window.speechSynthesis.cancel();
     bgVideo.pause();
+    distractionVideo.pause();
+    distractionVideo.style.display = 'none';
 
     document.getElementById('result-icon').textContent = survived ? '🏆' : '💀';
     document.getElementById('result-title').textContent = survived ? 'You survived!' : 'Eliminated';
     
-    const modeText = isHardMode ? ' (Hard Mode)' : '';
+    let modeText = '';
+    if (currentLevel === 2) modeText = ' (Level 2)';
+    if (currentLevel === 3) modeText = ' (Level 3)';
+    
     const desc = survived
       ? `Composure: ${Math.round(f_composure)}% · blinks: ${f_blinkCount} · rate: ${f_rateCount}${modeText}`
       : `Final composure: 0% · blinks: ${f_blinkCount} · talks: ${f_talkCount} · rate: ${f_rateCount}${modeText}`;
@@ -357,7 +378,6 @@
     show('flinchResult');
   }
 
-  // --- REPLAY ---
   async function startReplay() {
     if (!await loadData()) return;
     activeMode = 'replay';
@@ -391,11 +411,11 @@
     rafId = requestAnimationFrame(replayLoop);
   }
 
-  // --- EVENTS ---
-  document.getElementById('btn-normal').addEventListener('click', () => startFlinch(false));
-  document.getElementById('btn-hard').addEventListener('click', () => startFlinch(true));
+  document.getElementById('btn-level1').addEventListener('click', () => startFlinch(1));
+  document.getElementById('btn-level2').addEventListener('click', () => startFlinch(2));
+  document.getElementById('btn-level3').addEventListener('click', () => startFlinch(3));
   document.getElementById('btn-replay').addEventListener('click', startReplay);
-  document.getElementById('btn-flinch-restart').addEventListener('click', () => startFlinch(isHardMode));
+  document.getElementById('btn-flinch-restart').addEventListener('click', () => startFlinch(currentLevel));
   document.getElementById('btn-back').addEventListener('click', () => { show('consent'); });
   document.getElementById('btn-back-player').addEventListener('click', () => {
     activeMode = 'none';

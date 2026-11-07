@@ -582,6 +582,19 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   });
 
+  const _retryBtn = document.getElementById('btn-mp-retry');
+  if (_retryBtn) {
+    _retryBtn.addEventListener('click', () => {
+      console.log('[socket] retry clicked');
+      if (socket) { try { socket.disconnect(); } catch (e) {} socket = null; }
+      mpStatus.textContent = 'Reconnecting...';
+      mpStatus.style.color = '#fbbf24';
+      btnCreateRoom.disabled = true;
+      btnJoinRoom.disabled = true;
+      connectSocket();
+    });
+  }
+
   show('consent');
 })();
 

@@ -6,9 +6,20 @@ This project does not follow strict SemVer — it is a hackathon submission.
 ## [Unreleased]
 
 ### Added
-- (populate as you build)
+- Socket.IO server on `0.0.0.0:3000`. `create_room` returns 4-letter
+  code; `join_room` broadcasts `player_joined` to host.
+- Client `socket.io.min.js` (UMD) bundled in renderer.
+- Multiplayer screen: Create Room, Join Room, Retry Connection.
+- Retry handler: disconnect + reconnect on click.
 
----
+### Changed
+- Client connects to `http://127.0.0.1:3000` (not `localhost`).
+- CSP `connect-src` allows `http://127.0.0.1:3000 ws://127.0.0.1:3000`.
+- `run-phase-1c-fixed.ps1` preserves Socket.IO server across dev runs.
+
+### Fixed
+- "Server offline" was CSP block, not dead server (`LESSONS.md` L023).
+- `.ps1` parse cascade from em-dash (`LESSONS.md` L022).
 
 ## [0.3.0] — 2026-11-07 — Phase 2 COMPLETE
 

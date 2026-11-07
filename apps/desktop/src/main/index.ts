@@ -1,5 +1,5 @@
 import { app, BrowserWindow, ipcMain, protocol } from 'electron';
-import { readFileSync, stat, createReadStream, existsSync } from 'node:fs';
+import { readFileSync, stat, createReadStream, existsSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { Readable } from 'node:stream';
 
@@ -84,19 +84,15 @@ app.whenReady().then(() => {
     const distDir = join(FIXTURES_DIR, 'distractions');
     console.log('[check-assets] Looking for videos in:', distDir);
     
-    let missing = 0;
-    const found = [];
-    for (let i = 1; i <= 8; i++) {
-      const filePath = join(distDir, `distraction_${i}.mp4`);
-      if (existsSync(filePath)) {
-        found.push(filePath);
-      } else {
-        missing++;
-        console.warn('[check-assets] Missing:', filePath);
-      }
+    try {
+      const files = readdirSync(distDir).filter(f => f.endsWith('.mp4'));
+      const ready = files.length >= 8;
+      console.log(`[check-assets] Found ${files.length} mp4 files. Ready: ${ready}`);
+      return { ready, missing: Math.max(0, 8 - files.length), dir: distDir, found: files };
+    } catch (err) {
+      console.error('[check-assets] Folder error:', err);
+      return { ready: false, missing: 8, dir: distDir, found: [] };
     }
-    console.log(`[check-assets] Found ${8 - missing}/8 videos. Ready: ${missing === 0}`);
-    return { ready: missing === 0, missing, dir: distDir, found };
   });
 
   createWindow();

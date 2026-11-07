@@ -437,6 +437,22 @@ document.addEventListener('DOMContentLoaded', () => {
   // SOCKET LOGIC
   function connectSocket() {
     if (socket) return;
+    
+    // Segarkan status aset setiap kali masuk ke menu multiplayer
+    (async () => {
+      try {
+        const res = await window.presage.checkAssets();
+        assetsReady = res.ready;
+        if (res.ready) {
+          assetStatus.textContent = '✓ Game materials ready.';
+          assetStatus.style.color = '#4ade80';
+        } else {
+          assetStatus.textContent = `Missing ${res.missing} video(s). Level 3 is disabled.`;
+          assetStatus.style.color = '#fbbf24';
+        }
+      } catch(e) {}
+    })();
+
     socket = io('http://127.0.0.1:3000', { transports: ['websocket', 'polling'], timeout: 5000, reconnectionAttempts: 3 });
     
     socket.on('connect', () => {

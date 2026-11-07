@@ -2,25 +2,112 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <title>Presage Party — Phase 1b</title>
+  <meta http-equiv="Content-Security-Policy"
+        content="default-src 'self'; media-src 'self' presage:; script-src 'self'; style-src 'self' 'unsafe-inline'">
+  <title>Presage Party — Phase 1c</title>
   <style>
-    body { font-family: system-ui, sans-serif; background: #111; color: #eee; padding: 24px; margin: 0; }
-    h1 { font-weight: 500; letter-spacing: -0.02em; }
-    h2 { font-weight: 500; margin-top: 24px; }
-    .row { margin: 6px 0; font-size: 14px; }
-    .label { color: #888; display: inline-block; min-width: 140px; }
-    .value { color: #4ade80; }
-    .error { color: #f87171; }
-    pre { background: #1a1a1a; padding: 12px; border-radius: 6px; overflow: auto; max-height: 40vh; font-size: 12px; }
+    * { box-sizing: border-box; }
+    body { font-family: system-ui, sans-serif; background: #0b0b0b; color: #eee; margin: 0; min-height: 100vh; }
+    .screen { display: none; min-height: 100vh; padding: 32px; }
+    .screen.active { display: block; }
+    h1 { font-weight: 500; letter-spacing: -0.02em; margin: 0 0 4px; }
+    h2 { font-weight: 500; margin: 24px 0 8px; color: #ddd; }
+    p { color: #aaa; margin: 6px 0; }
+    ul { color: #aaa; padding-left: 20px; margin: 8px 0; }
+    li { margin: 4px 0; }
+    .btn { display: inline-block; padding: 12px 24px; border: 1px solid #444; background: #1a1a1a; color: #eee;
+           font-size: 15px; border-radius: 6px; cursor: pointer; margin-right: 12px; }
+    .btn:hover { background: #2a2a2a; border-color: #666; }
+    .btn-primary { background: #4ade80; color: #0a0a0a; border-color: #4ade80; font-weight: 600; }
+    .btn-primary:hover { background: #22c55e; border-color: #22c55e; }
+    .btn-danger { border-color: #f87171; color: #f87171; }
+    .btn-danger:hover { background: #2a1a1a; border-color: #ef4444; }
+    .consent-wrap { max-width: 640px; }
+    .privacy { background: #141414; border: 1px solid #222; padding: 16px; border-radius: 8px; margin: 16px 0; }
+    .privacy strong { color: #4ade80; }
+    .player-grid { display: grid; grid-template-columns: 1fr 340px; gap: 24px; align-items: start; }
+    video { width: 100%; background: #000; border-radius: 8px; }
+    .metrics { background: #141414; border: 1px solid #222; padding: 20px; border-radius: 8px; font-family: ui-monospace, monospace; }
+    .metric { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #1e1e1e; }
+    .metric:last-child { border-bottom: none; }
+    .metric .k { color: #888; font-size: 13px; }
+    .metric .v { color: #4ade80; font-size: 15px; font-weight: 500; }
+    .metric .v.warn { color: #fbbf24; }
+    .actions { margin-top: 20px; }
+    .time { color: #666; font-size: 12px; margin-top: 8px; }
+    .center { text-align: center; padding-top: 100px; }
+    .stopped-icon { font-size: 48px; color: #f87171; margin-bottom: 16px; }
   </style>
 </head>
 <body>
-  <h1>Presage Party — Phase 1b</h1>
-  <p style="color:#888">Electron shell loaded. Reading replay timeline via IPC.</p>
-  <div class="row"><span class="label">status</span><span id="status" class="value">loading...</span></div>
-  <div id="meta"></div>
-  <h2>Samples preview</h2>
-  <pre id="preview">(loading)</pre>
-  <script src="./renderer.js"></script>
+
+<!-- SCREEN: CONSENT -->
+<div id="screen-consent" class="screen active">
+  <div class="consent-wrap">
+    <h1>Presage Party</h1>
+    <p>Social party games where your body is the controller.</p>
+
+    <h2>What this app reads</h2>
+    <ul>
+      <li>Breathing amplitude (from your face)</li>
+      <li>Blink and talking detection</li>
+      <li>Breathing rate</li>
+    </ul>
+
+    <div class="privacy">
+      <strong>Privacy by design</strong>
+      <ul>
+        <li>Camera and video never leave your device</li>
+        <li>Only derived metrics are used for gameplay</li>
+        <li>No accounts, no server-side biometric storage</li>
+        <li>SDK telemetry is disabled</li>
+      </ul>
+    </div>
+
+    <p>This build uses <strong>replay mode</strong>: a pre-recorded session is played back
+       through the same pipeline. No live camera is accessed.</p>
+
+    <div class="actions">
+      <button id="btn-allow" class="btn btn-primary">Use replay</button>
+      <button id="btn-cancel" class="btn">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<!-- SCREEN: PLAYER -->
+<div id="screen-player" class="screen">
+  <div class="player-grid">
+    <div>
+      <video id="video" controls playsinline muted></video>
+      <div class="time" id="time">0.0 / 0.0 s</div>
+    </div>
+    <div>
+      <div class="metrics">
+        <div class="metric"><span class="k">breathing</span><span id="m-br" class="v">—</span></div>
+        <div class="metric"><span class="k">rate</span><span id="m-rate" class="v">—</span></div>
+        <div class="metric"><span class="k">blink</span><span id="m-blink" class="v">—</span></div>
+        <div class="metric"><span class="k">talking</span><span id="m-talk" class="v">—</span></div>
+        <div class="metric"><span class="k">stable rate</span><span id="m-stable" class="v">—</span></div>
+      </div>
+      <div class="actions">
+        <button id="btn-stop" class="btn btn-danger">Stop &amp; Delete</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- SCREEN: STOPPED -->
+<div id="screen-stopped" class="screen">
+  <div class="center">
+    <div class="stopped-icon">■</div>
+    <h1>Stopped</h1>
+    <p>Session ended. No data was stored.</p>
+    <div class="actions">
+      <button id="btn-restart" class="btn btn-primary">Restart</button>
+    </div>
+  </div>
+</div>
+
+<script src="./renderer.js"></script>
 </body>
 </html>

@@ -10,7 +10,8 @@
     "spike": "tsx scripts/spike-file.mts"
   },
   "dependencies": {
-    "@smartspectra/node-sdk": "*"
+    "@smartspectra/node-sdk": "*",
+    "socket.io-client": "^4.8.1"
   },
   "devDependencies": {
     "@types/node": "^22.10.0",

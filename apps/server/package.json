@@ -4,10 +4,14 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "echo 'server not wired yet — Phase 3'"
+    "dev": "echo 'server not wired yet \u2014 Phase 3'"
   },
   "devDependencies": {
     "tsx": "^4.19.2",
     "typescript": "^5.7.2"
+  },
+  "dependencies": {
+    "express": "^4.21.1",
+    "socket.io": "^4.8.1"
   }
 }

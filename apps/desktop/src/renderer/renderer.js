@@ -254,6 +254,18 @@ document.addEventListener('DOMContentLoaded', () => {
     if (activeMode === 'flinch' && currentLevel === 3) playRandomChallengeVideo();
   });
 
+  // Fallback: If video fails to load (e.g., asset missing on Windows), revert to Level 2 distractions
+  challengeVideo.addEventListener('error', (e) => {
+    if (currentLevel === 3) {
+      console.warn('[game] Challenge video failed to load. Falling back to Level 2 distractions.');
+      currentLevel = 2;
+      gameContainer.classList.remove('level3-mode');
+      bgVideo.style.opacity = '0.2';
+      distractionTimeout = setTimeout(triggerDistraction, 1000);
+      statusText.textContent = 'Video missing. Distractions active!';
+    }
+  });
+
   function show(name) {
     Object.keys(screens).forEach(k => screens[k].classList.toggle('active', k === name));
   }
@@ -738,6 +750,14 @@ document.addEventListener('DOMContentLoaded', () => {
   const _mpResultBack = document.getElementById('btn-mp-result-back');
   if (_mpResultBack) {
     _mpResultBack.addEventListener('click', () => {
+      myRoleInRoom = null;
+      show('consent');
+    });
+  }
+
+  const _waitingBackBtn = document.getElementById('btn-mp-waiting-back');
+  if (_waitingBackBtn) {
+    _waitingBackBtn.addEventListener('click', () => {
       myRoleInRoom = null;
       show('consent');
     });

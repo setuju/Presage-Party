@@ -4,9 +4,7 @@ import { Server } from 'socket.io';
 
 const app = express();
 const httpServer = createServer(app);
-const io = new Server(httpServer, {
-  cors: { origin: '*', methods: ['GET', 'POST'] },
-});
+const io = new Server(httpServer, { cors: { origin: '*', methods: ['GET', 'POST'] } });
 
 app.get('/', (req, res) => res.send('Presage Party Server is running.'));
 
@@ -16,94 +14,105 @@ interface Room { code: string; host: string; guest: string | null; startAt: numb
 const rooms = new Map<string, Room>();
 const socketToRoom = new Map<string, string>();
 
+process.on('uncaughtException', (err) => console.error('[FATAL] Uncaught Exception:', err));
+process.on('unhandledRejection', (err) => console.error('[FATAL] Unhandled Rejection:', err));
+
 io.on('connection', (socket) => {
   console.log(`[+] Client connected: ${socket.id}`);
 
   socket.on('create_room', (callback) => {
-    const code = Math.random().toString(36).substring(2, 6).toUpperCase();
-    rooms.set(code, { code, host: socket.id, guest: null, startAt: null, level: 1, results: { host: null, guest: null } });
-    socketToRoom.set(socket.id, code);
-    socket.join(code);
-    console.log(`Room created: ${code} by ${socket.id}`);
-    callback({ success: true, roomCode: code, role: 'host' });
+    try {
+      const code = Math.random().toString(36).substring(2, 6).toUpperCase();
+      rooms.set(code, { code, host: socket.id, guest: null, startAt: null, level: 1, results: { host: null, guest: null } });
+      socketToRoom.set(socket.id, code);
+      socket.join(code);
+      console.log(`Room created: ${code} by ${socket.id}`);
+      if (callback) callback({ success: true, roomCode: code, role: 'host' });
+    } catch (e) { console.error(e); if (callback) callback({ success: false }); }
   });
 
   socket.on('join_room', (code, callback) => {
-    const room = rooms.get(code);
-    if (!room) return callback({ success: false, error: 'Room not found' });
-    if (room.guest) return callback({ success: false, error: 'Room full' });
+    try {
+      const room = rooms.get(code);
+      if (!room) return callback && callback({ success: false, error: 'Room not found' });
+      if (room.guest) return callback && callback({ success: false, error: 'Room full' });
 
-    room.guest = socket.id;
-    socketToRoom.set(socket.id, code);
-    socket.join(code);
-    socket.to(code).emit('player_joined', socket.id);
-    socket.emit('room_joined', { host: room.host, code, role: 'guest' });
-    callback({ success: true, role: 'guest' });
-    console.log(`[>] ${socket.id} joined room ${code}`);
+      room.guest = socket.id;
+      socketToRoom.set(socket.id, code);
+      socket.join(code);
+      socket.to(code).emit('player_joined', socket.id);
+      socket.emit('room_joined', { host: room.host, code, role: 'guest' });
+      if (callback) callback({ success: true, role: 'guest' });
+      console.log(`[>] ${socket.id} joined room ${code}`);
+    } catch (e) { console.error(e); if (callback) callback({ success: false }); }
   });
 
-  socket.on('start_game', (data: { level: number }, callback) => {
-    const code = socketToRoom.get(socket.id);
-    const room = code ? rooms.get(code) : null;
-    if (!room) return callback({ success: false, error: 'Not in a room' });
-    if (room.host !== socket.id) return callback({ success: false, error: 'Only host can start' });
-    if (!room.guest) return callback({ success: false, error: 'No opponent yet' });
+  socket.on('start_game', (data, callback) => {
+    try {
+      const code = socketToRoom.get(socket.id);
+      const room = code ? rooms.get(code) : null;
+      if (!room) return callback && callback({ success: false, error: 'Not in a room' });
+      if (room.host !== socket.id) return callback && callback({ success: false, error: 'Only host can start' });
+      if (!room.guest) return callback && callback({ success: false, error: 'No opponent yet' });
 
-    room.level = data.level || 1;
-    room.startAt = Date.now() + 3000;
-    room.results = { host: null, guest: null };
-    io.to(code).emit('game_start', { startAt: room.startAt, level: room.level });
-    console.log(`[game] room ${code} starting at ${room.startAt} level ${room.level}`);
-    callback({ success: true });
+      room.level = (data && data.level) || 1;
+      room.startAt = Date.now() + 3000;
+      room.results = { host: null, guest: null };
+      io.to(code).emit('game_start', { startAt: room.startAt, level: room.level });
+      console.log(`[game] room ${code} starting at ${room.startAt} level ${room.level}`);
+      if (callback) callback({ success: true });
+    } catch (e) { console.error(e); if (callback) callback({ success: false }); }
   });
 
-  socket.on('report_score', (data: ScoreReport, callback) => {
-    const code = socketToRoom.get(socket.id);
-    const room = code ? rooms.get(code) : null;
-    if (!room) return callback({ success: false, error: 'Not in a room' });
+  socket.on('report_score', (data, callback) => {
+    try {
+      const code = socketToRoom.get(socket.id);
+      const room = code ? rooms.get(code) : null;
+      if (!room) return callback && callback({ success: false, error: 'Not in a room' });
 
-    const role: 'host' | 'guest' = socket.id === room.host ? 'host' : 'guest';
-    room.results[role] = data;
-    console.log(`[score] ${role} reported: ${JSON.stringify(data)}`);
+      const role = socket.id === room.host ? 'host' : 'guest';
+      room.results[role] = data;
+      console.log(`[score] ${role} reported: ${JSON.stringify(data)}`);
 
-    if (room.results.host && room.results.guest) {
-      const hostScore = room.results.host.score || 0;
-      const guestScore = room.results.guest.score || 0;
-      const winner = hostScore > guestScore ? 'host' : guestScore > hostScore ? 'guest' : 'tie';
-      io.to(code).emit('game_result', { host: room.results.host, guest: room.results.guest, winner });
-      console.log(`[game] room ${code} result: winner=${winner}`);
-    }
-    callback({ success: true });
+      if (room.results.host && room.results.guest) {
+        const hScore = room.results.host.score || 0;
+        const gScore = room.results.guest.score || 0;
+        const winner = hScore > gScore ? 'host' : gScore > hScore ? 'guest' : 'tie';
+        io.to(code).emit('game_result', { host: room.results.host, guest: room.results.guest, winner });
+        console.log(`[game] room ${code} result: winner=${winner}`);
+      }
+      if (callback) callback({ success: true });
+    } catch (e) { console.error(e); if (callback) callback({ success: false }); }
   });
 
   socket.on('disconnect', () => {
-    const code = socketToRoom.get(socket.id);
-    if (code) {
-      const room = rooms.get(code);
-      if (room) {
-        if (room.host === socket.id) {
-          if (room.guest) {
-            room.host = room.guest;
+    try {
+      const code = socketToRoom.get(socket.id);
+      if (code) {
+        const room = rooms.get(code);
+        if (room) {
+          if (room.host === socket.id) {
+            if (room.guest) {
+              room.host = room.guest;
+              room.guest = null;
+              io.to(code).emit('host_migrated', room.host);
+              console.log(`Room ${code}: host left, promoted guest`);
+            } else {
+              rooms.delete(code);
+              console.log(`Room ${code} cleaned up (empty)`);
+            }
+          } else if (room.guest === socket.id) {
             room.guest = null;
-            io.to(code).emit('host_migrated', room.host);
-            console.log(`Room ${code}: host left, promoted guest to host`);
-          } else {
-            rooms.delete(code);
-            console.log(`Room ${code} cleaned up (empty)`);
+            io.to(code).emit('opponent_left');
+            console.log(`Room ${code}: guest left`);
           }
-        } else if (room.guest === socket.id) {
-          room.guest = null;
-          io.to(code).emit('opponent_left');
-          console.log(`Room ${code}: guest left`);
         }
+        socketToRoom.delete(socket.id);
       }
-      socketToRoom.delete(socket.id);
-    }
-    console.log(`[-] Client disconnected: ${socket.id}`);
+      console.log(`[-] Client disconnected: ${socket.id}`);
+    } catch (e) { console.error(e); }
   });
 });
 
 const PORT = 3000;
-httpServer.listen(PORT, '0.0.0.0', () => {
-  console.log(`Server running on http://0.0.0.0:${PORT}`);
-});
+httpServer.listen(PORT, '0.0.0.0', () => console.log(`Server running on http://0.0.0.0:${PORT}`));

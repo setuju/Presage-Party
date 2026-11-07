@@ -3,6 +3,7 @@
 document.addEventListener('DOMContentLoaded', () => {
   const screens = {
     consent: document.getElementById('screen-consent'),
+    rules: document.getElementById('screen-rules'),
     flinch: document.getElementById('screen-flinch'),
     flinchResult: document.getElementById('screen-flinch-result'),
     player: document.getElementById('screen-player')
@@ -23,6 +24,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const alertFlinch = document.getElementById('alert-flinch');
   const debugHud = document.getElementById('debug-hud');
   const distractionContainer = document.getElementById('distraction-container');
+  const revealMessage = document.getElementById('reveal-message');
 
   const mBr = document.getElementById('m-br');
   const mRate = document.getElementById('m-rate');
@@ -173,7 +175,6 @@ document.addEventListener('DOMContentLoaded', () => {
     distractionTimeout = setTimeout(triggerDistraction, nextDelay);
   }
 
-  // --- Level 3 Logic: Random Video Challenge ---
   function playRandomChallengeVideo() {
     if (currentLevel !== 3 || activeMode !== 'flinch' || challengeVideoUrls.length === 0) return;
     
@@ -181,12 +182,10 @@ document.addEventListener('DOMContentLoaded', () => {
     challengeVideo.src = url;
     challengeVideo.play().catch(e => {
       console.warn('Failed to play challenge video:', e);
-      // Jika gagal putar, coba video lain setelah 1 detik
       setTimeout(playRandomChallengeVideo, 1000);
     });
   }
 
-  // Jika video habis sebelum 30 detik, putar video lain
   challengeVideo.addEventListener('ended', () => {
     if (activeMode === 'flinch' && currentLevel === 3) {
       playRandomChallengeVideo();
@@ -237,6 +236,9 @@ document.addEventListener('DOMContentLoaded', () => {
     window.speechSynthesis.cancel();
     distractionContainer.innerHTML = '';
     clearTimeout(distractionTimeout);
+    
+    // Sembunyikan reveal message
+    revealMessage.style.display = 'none';
 
     // Reset Layout
     gameContainer.classList.remove('level3-mode');
@@ -246,11 +248,10 @@ document.addEventListener('DOMContentLoaded', () => {
     // Setup Level Specifics
     if (level === 3) {
       gameContainer.classList.add('level3-mode');
-      bgVideo.style.opacity = '0'; // Hide blurred bg
-      // Mulai video acak pertama kali setelah 1 detik (beri waktu render layout)
+      bgVideo.style.opacity = '0';
       setTimeout(playRandomChallengeVideo, 1000);
     } else {
-      bgVideo.style.opacity = '0.2'; // Show blurred bg
+      bgVideo.style.opacity = '0.2';
       if (level === 2) {
         distractionTimeout = setTimeout(triggerDistraction, 3000);
       }
@@ -373,7 +374,6 @@ document.addEventListener('DOMContentLoaded', () => {
     clearTimeout(distractionTimeout);
     window.speechSynthesis.cancel();
     
-    // Hentikan semua video
     bgVideo.pause();
     challengeVideo.pause();
     challengeVideo.removeAttribute('src');
@@ -389,6 +389,11 @@ document.addEventListener('DOMContentLoaded', () => {
       ? `Composure: ${Math.round(f_composure)}% · blinks: ${f_blinkCount} · rate: ${f_rateCount}${modeText}`
       : `Final composure: 0% · blinks: ${f_blinkCount} · talks: ${f_talkCount} · rate: ${f_rateCount}${modeText}`;
     document.getElementById('result-desc').textContent = desc;
+
+    // Tampilkan reveal message jika bukan Chill Mode
+    if (currentLevel > 1) {
+      revealMessage.style.display = 'block';
+    }
 
     show('flinchResult');
   }
@@ -426,12 +431,18 @@ document.addEventListener('DOMContentLoaded', () => {
     rafId = requestAnimationFrame(replayLoop);
   }
 
+  // --- Event Listeners ---
   document.getElementById('btn-level1').addEventListener('click', () => startFlinch(1));
   document.getElementById('btn-level2').addEventListener('click', () => startFlinch(2));
   document.getElementById('btn-level3').addEventListener('click', () => startFlinch(3));
   document.getElementById('btn-replay').addEventListener('click', startReplay);
   document.getElementById('btn-flinch-restart').addEventListener('click', () => startFlinch(currentLevel));
   document.getElementById('btn-back').addEventListener('click', () => { show('consent'); });
+  
+  // Navigasi Rules
+  document.getElementById('btn-rules').addEventListener('click', () => show('rules'));
+  document.getElementById('btn-rules-back').addEventListener('click', () => show('consent'));
+
   document.getElementById('btn-back-player').addEventListener('click', () => {
     activeMode = 'none';
     video.pause();

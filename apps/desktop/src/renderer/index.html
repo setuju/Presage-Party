@@ -90,6 +90,12 @@
     .debug-hud { position: absolute; bottom: 20px; right: 20px; z-index: 30;
                  font-family: ui-monospace, monospace; font-size: 12px; color: #666;
                  background: rgba(0,0,0,0.8); padding: 8px 12px; border-radius: 6px; border: 1px solid #222; pointer-events: none; }
+                 
+    /* Rules Screen */
+    .rules-content { text-align: left; line-height: 1.6; color: #ccc; }
+    .rules-content h2 { color: #4ade80; margin-top: 24px; border-bottom: 1px solid #333; padding-bottom: 8px; }
+    .rules-content ul { margin-bottom: 20px; }
+    .rules-content strong { color: #fff; }
   </style>
 </head>
 <body>
@@ -112,11 +118,41 @@
 
     <p>This build uses <strong>replay mode</strong>. No live camera is accessed.</p>
 
-    <div style="display:flex; gap:16px; margin-top:32px; flex-wrap:wrap;">
+    <div style="display:flex; gap:12px; margin-top:32px; flex-wrap:wrap;">
       <button id="btn-level1" class="btn btn-primary" style="flex:1;">Chill Mode</button>
       <button id="btn-level2" class="btn btn-level2" style="flex:1;">Seriously?</button>
       <button id="btn-level3" class="btn btn-level3" style="flex:1;">Why So Serious?</button>
-      <button id="btn-replay" class="btn" style="width:100%;">Metrics Replay (Dev)</button>
+    </div>
+    <div style="margin-top:12px;">
+      <button id="btn-rules" class="btn" style="width:100%; border-color:#555;">View Game Rules</button>
+      <button id="btn-replay" class="btn" style="width:100%; color:#666; border-color:#222; font-size:14px; padding:10px;">Metrics Replay (Dev)</button>
+    </div>
+  </div>
+</div>
+
+<!-- SCREEN: RULES -->
+<div id="screen-rules" class="screen">
+  <div class="consent-wrap rules-content">
+    <h1 style="color:#fff;">How to Play</h1>
+    <p>Welcome to <strong>Flinch Royale</strong>. Your goal is simple: maintain your composure for 30 seconds.</p>
+    
+    <h2>Core Mechanics</h2>
+    <ul>
+      <li><strong>Composure:</strong> Starts at 100%. If it reaches 0%, you are eliminated.</li>
+      <li><strong>Flinching (Blinks):</strong> Every blink reduces your composure. Keep your eyes steady.</li>
+      <li><strong>Talking:</strong> Sustained vocalization will drain your composure rapidly.</li>
+      <li><strong>Heart Rate:</strong> If your biometric reading spikes above the threshold, you will lose composure over time.</li>
+    </ul>
+
+    <h2>Game Modes</h2>
+    <ul>
+      <li><strong>Chill Mode:</strong> The baseline test. No external distractions.</li>
+      <li><strong>Seriously?:</strong> Adds unpredictable computer-generated auditory and visual distractors designed to break your focus.</li>
+      <li><strong>Why So Serious?:</strong> The ultimate test. Replaces standard distractors with a randomized video challenge. You must endure without laughing or flinching. No skip controls are provided.</li>
+    </ul>
+
+    <div style="margin-top:32px; text-align:center;">
+      <button id="btn-rules-back" class="btn btn-primary" style="padding:16px 40px;">I Understand</button>
     </div>
   </div>
 </div>
@@ -126,7 +162,6 @@
   <video id="bg-video" playsinline muted></video>
   
   <div id="game-container" class="game-container">
-    <!-- Layout Khusus Level 3 -->
     <div class="level3-video-wrapper">
       <video id="challenge-video" playsinline></video>
     </div>
@@ -155,6 +190,12 @@
     <div class="result-icon" id="result-icon">🏆</div>
     <h1 class="result-title" id="result-title">You survived!</h1>
     <p class="result-desc" id="result-desc">Composure remaining: 100%</p>
+    
+    <!-- Pesan rahasia setelah game selesai -->
+    <p id="reveal-message" style="color:#666; font-size:14px; margin-top:24px; display:none; font-style:italic;">
+      * The sounds and texts you experienced were entirely computer-generated for this game.
+    </p>
+    
     <div class="actions" style="margin-top:48px;">
       <button id="btn-flinch-restart" class="btn btn-primary">Play Again</button>
       <button id="btn-back" class="btn">Back to Menu</button>

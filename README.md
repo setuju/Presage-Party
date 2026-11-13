@@ -28,10 +28,6 @@ Submission for the **Presage SmartSpectra SDK Challenge** (Nov 4–22, 2026).
 - SDK telemetry is **disabled** (`enableTelemetry = false`).
 - Optional "sample recording" mode lets judges test the app **without a camera**.
 
-## Try it without a camera (Replay Mode)
-
-The app ships with a **replay mode**. A pre-recorded JSON stream drives gameplay identically to the live camera. Press `R` on the consent screen or use the built-in JSON to play immediately.
-
 ## Multiplayer Royale (New!)
 - **Private & Public Rooms:** Create a room with an optional password.
 - **Synchronized Gameplay:** Both players face the exact same sequence guaranteed by room-code hashing.

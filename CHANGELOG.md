@@ -3,7 +3,33 @@
 Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 This project does not follow strict SemVer — it is a hackathon submission.
 
-## [Unreleased]
+## [0.4.0] - 2026-11-08 - Phase 3 COMPLETE
+
+### Added
+- Socket.IO multiplayer server with room codes, password protection, and
+  lobby list (`rooms_list` event).
+- Deterministic sync: video/jumpscare sequences seeded by room code hash
+  and `rematchCount` (`videoOffset = (rematchCount - 1) * 3`).
+- Host migration: if host disconnects mid-room, guest becomes host
+  (`host_migrated` event).
+- Scoreboard with real names, rematch support with rotation.
+- Anti-cheat: `visibilitychange` detection via `visibility_change` event.
+  Recurring -10 composure per 3 seconds while minimized (was one-shot).
+
+### Fixed
+- Anti-cheat event name mismatch: server emitted `cheat_detected`, client
+  listened for `cheat_penalty` — client never received penalties.
+  Now server emits `cheat_penalty` (target) + `opponent_cheated` (opponent).
+- Anti-cheat was one-shot per minimize. Now recurring via recursive
+  `setTimeout(tick, 3000)` with auto-stop when game ends.
+- Pre-jumpscare anti-cheat state (`f_lastBlinkState`) now properly reset
+  after jumpscare window (600ms).
+
+### Changed
+- `run-phase-1c-fixed.ps1` preserves Socket.IO server across dev runs.
+- Client connects to `http://127.0.0.1:3000` (not `localhost`) to bypass
+  CSP ambiguity.
+
 
 ### Added
 - Socket.IO server on `0.0.0.0:3000`. `create_room` returns 4-letter

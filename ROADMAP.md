@@ -92,42 +92,69 @@ with no cheats passing plausibility checks.
 
 ---
 
-## Phase 4 — Second Visual Mode (Nov 15–16, 2 days)
+## Phase 4 — Second Visual Mode [DROPPED] (Nov 8)
 
-**Goal:** one more mode that looks great in a 20-second clip.
+**Goal (original):** one more mode that looks great in a 20-second clip.
 
-Pick **one** of:
-- **Body as Instrument** (Web Audio) — highest visual payoff per hour
-- **Breath Vault** (Phaser) — highest narrative payoff
+**Decision:** DROPPED. Prioritize final polish + demo video. Rationale:
+- `LESSONS.md` L010: demo video = 50% of practical score. 3 minutes of
+  recording + editing + backup takes is worth more than a second mode.
+- The 8 segments in `docs/DEMO_SCRIPT.md` already cover solo (L3, L4),
+  multiplayer (sync + anti-cheat), and live signal — the four pillars of
+  the judging criteria.
+- A second mode would dilute polish time and risk half-finished UI at
+  submission.
 
-Do **not** do both.
-
----
-
-## Phase 5 — Polish + Submission Artifacts (Nov 17–19, 3 days)
-
-- [ ] `README.md` finalized (one paragraph + GIF + judge mode)
-- [ ] `INSTRUCTIONS.md` for judges
-- [ ] Sample recording file included
-- [ ] `CHANGELOG.md` up to date
-- [ ] `SECURITY.md` finalized (threat model)
-- [ ] Remaining modes (Breathe Together, It Knows, Breath Switch) documented
-      but **not demoed**
-
-**Exit criterion:** a stranger can clone the repo and play within 5 minutes.
+**If the decision is revisited** (requires Harsh Judge sign-off per
+`SYSTEM_PROMPT.md` §4 step 5): pick **Body as Instrument** (Web Audio)
+only — highest visual payoff per hour. Do not do both.
 
 ---
 
-## Phase 6 — Video + Submission Post (Nov 20–21, 2 days)
+## Phase 5 — Polish + Submission Artifacts [WIP] IN PROGRESS (Nov 8–20)
 
-- [ ] Demo video recorded (3 min, script in `docs/DEMO_SCRIPT.md`)
-- [ ] Backup recording (in case live recording glitches)
-- [ ] DEV submission post drafted in the official template
+**Documentation (DONE Nov 8):**
+- [x] `README.md` finalized (badges + quick start + architecture diagram)
+- [x] `INSTRUCTIONS.md` cleaned (stale React/Phaser refs removed)
+- [x] `CHANGELOG.md` `[0.4.0]` added for Phase 3
+- [x] `HANDOFF.md` synced
+- [x] `docs/DEMO_SCRIPT.md` (180s storyboard)
+- [x] `docs/SHOT_LIST.md` (recording checklist)
+- [x] `LESSONS.md` L024 appended (event name mismatch)
+- [x] `DEV_NOTES.md` session 10 appended
+- [x] `docs/SECURITY.md` + `docs/ARCHITECTURE.md` aligned with code
+
+**Code polish (PENDING):**
+- [ ] Add SFX (blink tick, jumpscare, victory) — currently only TTS
+- [ ] UI transitions (screen fade in/out)
+- [ ] Test video smoothness on Windows (verify `presage://` 206 works
+      without buffering on 3 target machines)
+- [ ] Verify TTS voice on Windows (needed for Segment 4 demo)
+- [ ] Anti-cheat recurring penalty — end-to-end test (2 windows, minimize,
+      wait 10s, verify =3 ticks)
+- [ ] `docs/SECURITY.md` threat model final pass with Rhea persona
+- [ ] Medical language grep (L002)
+
+**Exit criterion:** a stranger can clone the repo and play within 5 minutes
+AND the build is stable enough to record without retakes.
+
+---
+
+## Phase 6 — Video + Submission Post [PENDING] (Nov 20–21, 2 days)
+
+- [ ] Demo video recorded (3:00, `docs/DEMO_SCRIPT.md`)
+- [ ] Follow `docs/SHOT_LIST.md` (backup take for Segments 5 and 6)
+- [ ] Post-production: captions, blur face30.mp4 if needed, export
+      1080p60 CRF 20 faststart
+- [ ] Backup recording exported as 720p60 CRF 24 (for slow connections)
+- [ ] GIF for README extracted (3s jumpscare loop)
+- [ ] DEV submission post drafted in official template
 - [ ] Prize category declared: **Most Creative** + **Best Thoughtful**
-- [ ] Final self-review pass using Harsh Judge persona (see `PERSONAS.md`)
+- [ ] Final self-review using Harsh Judge checklist (5 questions in
+      `PERSONAS.md`)
 
 **Exit criterion:** every required element from `docs/CHALLENGE_INFO.md`
-is present in the submission.
+is present in the submission. Demo video shows live signal (Iris gate met).
 
 ---
 

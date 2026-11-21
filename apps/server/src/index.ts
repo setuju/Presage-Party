@@ -134,21 +134,32 @@ io.on('connection', (socket) => {
   socket.on('visibility_change', (isVisible) => {
     const code = socketToRoom.get(socket.id);
     const room = code ? rooms.get(code) : null;
-    if (!room || !room.startAt || room.startAt > Date.now()) return; 
+    if (!room || !room.startAt || room.startAt > Date.now()) return;
+
+    const clearHiddenTimer = () => {
+      const t = hiddenTimeouts.get(socket.id);
+      if (t) { clearTimeout(t); hiddenTimeouts.delete(socket.id); }
+    };
+
+    const schedulePenalty = () => {
+      const tick = () => {
+        const currentRoom = rooms.get(code);
+        if (!currentRoom || !currentRoom.startAt || currentRoom.startAt > Date.now()) {
+          hiddenTimeouts.delete(socket.id);
+          return;
+        }
+        console.log(`[CHEAT] ${socket.id} minimized >3s. -10 composure.`);
+        socket.emit('cheat_penalty', 10);
+        socket.to(code).emit('opponent_cheated');
+        hiddenTimeouts.set(socket.id, setTimeout(tick, 3000));
+      };
+      hiddenTimeouts.set(socket.id, setTimeout(tick, 3000));
+    };
 
     if (!isVisible) {
-      if (!hiddenTimeouts.has(socket.id)) {
-        hiddenTimeouts.set(socket.id, setTimeout(() => {
-          console.log(`[CHEAT] Player ${socket.id} minimized window for >3s.`);
-          io.to(code).emit('cheat_detected', socket.id);
-          hiddenTimeouts.delete(socket.id);
-        }, 3000));
-      }
+      if (!hiddenTimeouts.has(socket.id)) schedulePenalty();
     } else {
-      if (hiddenTimeouts.has(socket.id)) {
-        clearTimeout(hiddenTimeouts.get(socket.id));
-        hiddenTimeouts.delete(socket.id);
-      }
+      clearHiddenTimer();
     }
   });
 

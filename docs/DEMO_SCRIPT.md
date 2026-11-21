@@ -62,7 +62,7 @@ face video, processed in our WSL pipeline. Same pipeline, same game logic.
 |------|--------|-------|
 | 1:15 | Click Level 4 button (purple outline) | SFX: horror stinger |
 | 1:20 | Timer counts 30 ? 20, no distractions (tension building) | SFX: heartbeat rhythm |
-| 1:38 | JUMPSCARE overlay (face flashes, red bg) at ~22s | SFX: jumpscare scream |
+| 1:20 | JUMPSCARE overlay (face flashes, red bg) at ~4s elapsed | SFX: jumpscare scream |
 | 1:40 | Post-jumpscare blink ? composure drops -25% | SFX: "FLINCH!" |
 | 1:43 | Result screen shows score | VO: "Blink after a scare — it costs you." |
 

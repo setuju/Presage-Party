@@ -4,8 +4,10 @@ import { join } from 'node:path';
 import { Readable } from 'node:stream';
 
 const FIXTURES_DIR = join(__dirname, '..', '..', 'fixtures');
-const TIMELINE_PATH = join(FIXTURES_DIR, 'face30.metrics.json');
-const VIDEO_URL = 'presage://local/face30.mp4';
+const TIMELINE_PATH_PRIMARY = join(FIXTURES_DIR, 'face30.metrics.json');
+const TIMELINE_PATH_FALLBACK = join(FIXTURES_DIR, 'demo.metrics.json');
+const VIDEO_URL_PRIMARY = 'presage://local/face30.mp4';
+const VIDEO_URL_FALLBACK = 'presage://local/distractions/distraction_1.mp4';
 
 // Opsional: Nonaktifkan hardware acceleration jika video masih stutter.
 // app.disableHardwareAcceleration();
@@ -15,8 +17,14 @@ protocol.registerSchemesAsPrivileged([
 ]);
 
 function readTimeline(): unknown {
-  try { return JSON.parse(readFileSync(TIMELINE_PATH, 'utf8')); } 
-  catch (err) { return { error: (err as Error).message, path: TIMELINE_PATH }; }
+  const chosenPath = existsSync(TIMELINE_PATH_PRIMARY) ? TIMELINE_PATH_PRIMARY : TIMELINE_PATH_FALLBACK;
+  try { return JSON.parse(readFileSync(chosenPath, 'utf8')); }
+  catch (err) { return { error: (err as Error).message, path: chosenPath }; }
+}
+
+function resolveVideoUrl(): string {
+  const primaryFile = join(FIXTURES_DIR, 'face30.mp4');
+  return existsSync(primaryFile) ? VIDEO_URL_PRIMARY : VIDEO_URL_FALLBACK;
 }
 
 function createWindow(): void {
@@ -79,7 +87,7 @@ app.whenReady().then(() => {
   });
 
   ipcMain.handle('get-timeline', () => readTimeline());
-  ipcMain.handle('get-video-url', () => VIDEO_URL);
+  ipcMain.handle('get-video-url', () => resolveVideoUrl());
   ipcMain.handle('check-assets', () => {
     const distDir = join(FIXTURES_DIR, 'distractions');
     console.log('[check-assets] Looking for videos in:', distDir);

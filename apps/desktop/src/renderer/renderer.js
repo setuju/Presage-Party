@@ -549,6 +549,12 @@ document.addEventListener('DOMContentLoaded', () => {
         popAlert(`-${amount}`);
       }
     });
+
+    socket.on('opponent_cheated', () => {
+      if (activeMode === 'flinch') {
+        statusText.textContent = 'Opponent minimized - penalty applied!';
+      }
+    });
   }
 
   // INIT
@@ -684,9 +690,15 @@ document.addEventListener('DOMContentLoaded', () => {
     const waitingBack = document.getElementById('btn-mp-waiting-back');
     if (waitingBack) waitingBack.addEventListener('click', () => { myRoleInRoom = null; show('consent'); });
 
-    document.addEventListener('visibilitychange', () => {
-      if (socket && socket.connected) socket.emit('visibility_change', document.visibilityState === 'visible');
-    });
+document.addEventListener('keydown', (e) => {
+  if ((e.key === 'r' || e.key === 'R') && screens.consent && screens.consent.classList.contains('active')) {
+    startReplay();
+  }
+});
+
+document.addEventListener('visibilitychange', () => {
+  if (socket && socket.connected) socket.emit('visibility_change', document.visibilityState === 'visible');
+});
   }
 
   initApp();

@@ -4,10 +4,21 @@
     "https://presage-party.onrender.com"
   ];
 
+  const DISTRACTION_FILES = [
+    "./assets/distractions/distraction_1.mp4",
+    "./assets/distractions/distraction_2.mp4",
+    "./assets/distractions/distraction_3.mp4",
+    "./assets/distractions/distraction_4.mp4",
+    "./assets/distractions/distraction_5.mp4",
+    "./assets/distractions/distraction_6.mp4",
+    "./assets/distractions/distraction_7.mp4",
+    "./assets/distractions/distraction_8.mp4"
+  ];
+
   const MODE_META = {
     1: { name: "Chill Mode", hint: "Steady composure. No distractions." },
     2: { name: "Seriously?", hint: "Audio & text distractions active." },
-    3: { name: "Why So Serious?", hint: "Intense distraction focus. Stay composed." },
+    3: { name: "Why So Serious?", hint: "Video challenge active. Keep composure!" },
     4: { name: "Don't Scream", hint: "Scare cues active. Post-scare flinches cost -15." }
   };
 
@@ -16,11 +27,15 @@
   let pollTimer = null;
 
   let playerName = "Jack";
-  let role = "solo"; // "host" | "guest" | "solo"
+  let role = "solo";
   let roomCode = "";
   let players = [];
   let rooms = [];
   let scores = [];
+
+  let videoPackReady = false;
+  let videoPackDownloading = false;
+  const cachedBlobUrls = [];
 
   let currentLevel = 1;
   let durationSec = 30;
@@ -34,6 +49,8 @@
   let lastTriggerSlot = -1;
   let postScareUntilMs = 0;
   let rafId = null;
+  let camStream = null;
+  let replayData = null;
 
   const connStatusEl = document.getElementById("conn-status");
   const pillModeEl = document.getElementById("pill-mode");
@@ -46,6 +63,12 @@
   const playerListEl = document.getElementById("player-list");
   const btnStartMpEl = document.getElementById("btn-start-mp");
 
+  const assetBannerEl = document.getElementById("asset-banner");
+  const assetBannerTitleEl = document.getElementById("asset-banner-title");
+  const assetBannerDescEl = document.getElementById("asset-banner-desc");
+  const assetProgressBarEl = document.getElementById("asset-progress-bar");
+  const btnDownloadAssetsEl = document.getElementById("btn-download-assets");
+
   const arenaTitleEl = document.getElementById("arena-title");
   const arenaSubEl = document.getElementById("arena-sub");
   const composureBarEl = document.getElementById("composure-bar");
@@ -55,11 +78,20 @@
   const hudScoreEl = document.getElementById("hud-score");
   const hudBlinksEl = document.getElementById("hud-blinks");
   const hudTalksEl = document.getElementById("hud-talks");
+  const arenaStageEl = document.getElementById("arena-stage");
+  const videoStageBoxEl = document.getElementById("video-stage-box");
+  const arenaVideoEl = document.getElementById("arena-video");
   const stageTimerEl = document.getElementById("stage-timer");
   const stageStatusEl = document.getElementById("stage-status");
+  const videoCaptionEl = document.getElementById("video-caption");
   const alertBadgeEl = document.getElementById("alert-badge");
   const jumpscareLayerEl = document.getElementById("jumpscare-layer");
   const scoreboardRowsEl = document.getElementById("scoreboard-rows");
+
+  const telBrEl = document.getElementById("tel-br");
+  const telRateEl = document.getElementById("tel-rate");
+  const telBlinkEl = document.getElementById("tel-blink");
+  const telTalkEl = document.getElementById("tel-talk");
 
   window.setTab = function (tabId) {
     document.querySelectorAll(".tab").forEach(btn => {
@@ -76,13 +108,186 @@
     if (!alertBadgeEl) return;
     alertBadgeEl.textContent = msg;
     alertBadgeEl.classList.add("show");
-    setTimeout(() => alertBadgeEl.classList.remove("show"), 900);
+    setTimeout(() => alertBadgeEl.classList.remove("show"), 950);
+  }
+
+  function updateAssetBannerUi(pct, statusText) {
+    if (assetProgressBarEl && typeof pct === "number") {
+      assetProgressBarEl.style.width = Math.max(0, Math.min(100, pct)) + "%";
+    }
+    if (videoPackReady) {
+      if (assetBannerEl) assetBannerEl.classList.add("ready");
+      if (assetBannerTitleEl) assetBannerTitleEl.textContent = "Video Pack Ready (8/8 Clips Cached)";
+      if (assetBannerDescEl) {
+        assetBannerDescEl.textContent = statusText || "All distraction video clips for Level 3 ('Why So Serious?') are ready to play.";
+      }
+      if (btnDownloadAssetsEl) {
+        btnDownloadAssetsEl.disabled = false;
+        btnDownloadAssetsEl.textContent = "Video Pack Ready (Re-verify)";
+      }
+    } else {
+      if (assetBannerEl) assetBannerEl.classList.remove("ready");
+      if (assetBannerTitleEl) assetBannerTitleEl.textContent = "Data Download Notice — Level 3 Video Pack (~26.8 MB)";
+      if (assetBannerDescEl) {
+        assetBannerDescEl.textContent = statusText || "Level 3 ('Why So Serious?') downloads/plays 8 video clips (~26.8 MB total). Download the pack below or use Level 2 ('Seriously?') to avoid video data usage.";
+      }
+      if (btnDownloadAssetsEl) {
+        btnDownloadAssetsEl.disabled = videoPackDownloading;
+        btnDownloadAssetsEl.textContent = videoPackDownloading ? "Downloading Video Pack..." : "Download Video Pack (~26.8 MB)";
+      }
+    }
+  }
+
+  window.downloadVideoPack = async function () {
+    if (videoPackDownloading) return;
+    videoPackDownloading = true;
+    let totalBytes = 0;
+    let loadedFiles = 0;
+    updateAssetBannerUi(5, "Downloading 8 distraction clips (~26.8 MB)...");
+
+    for (let i = 0; i < DISTRACTION_FILES.length; i++) {
+      const url = DISTRACTION_FILES[i];
+      try {
+        const resp = await fetch(url, { cache: "default" });
+        if (!resp.ok) throw new Error("HTTP " + resp.status);
+        const blob = await resp.blob();
+        totalBytes += blob.size;
+        cachedBlobUrls[i] = URL.createObjectURL(blob);
+        loadedFiles += 1;
+        const pct = Math.round(((i + 1) / DISTRACTION_FILES.length) * 100);
+        const mb = (totalBytes / (1024 * 1024)).toFixed(1);
+        updateAssetBannerUi(pct, "Downloaded " + loadedFiles + "/" + DISTRACTION_FILES.length + " clips (" + mb + " MB)...");
+      } catch (e) {
+        console.warn("[asset-pack] fallback stream for", url, e);
+      }
+    }
+
+    videoPackDownloading = false;
+    videoPackReady = loadedFiles >= 1;
+    const mbDone = (totalBytes / (1024 * 1024)).toFixed(1);
+    updateAssetBannerUi(
+      videoPackReady ? 100 : 0,
+      videoPackReady
+        ? "Ready: " + loadedFiles + "/" + DISTRACTION_FILES.length + " clips loaded (" + mbDone + " MB). Level 3 unlocked."
+        : "Could not pre-download video pack. Use Level 2 ('Seriously?') or try again."
+    );
+  };
+
+  function playRandomLevel3Clip() {
+    if (!arenaVideoEl || !videoStageBoxEl) return;
+    const idx = Math.floor(Math.random() * DISTRACTION_FILES.length);
+    const src = cachedBlobUrls[idx] || DISTRACTION_FILES[idx];
+    videoStageBoxEl.style.display = "flex";
+    if (arenaStageEl) arenaStageEl.classList.add("video-split");
+    if (videoCaptionEl) videoCaptionEl.textContent = "Playing clip #" + (idx + 1) + " of " + DISTRACTION_FILES.length + " — stay composed!";
+
+    arenaVideoEl.srcObject = null;
+    arenaVideoEl.src = src;
+    arenaVideoEl.muted = false;
+    arenaVideoEl.play().catch(() => {
+      arenaVideoEl.muted = true;
+      arenaVideoEl.play().catch(() => {
+        if (stageStatusEl) stageStatusEl.textContent = "Tap play on video or fallback to Level 2 ('Seriously?').";
+      });
+    });
+  }
+
+  function stopArenaVideo() {
+    if (arenaVideoEl) {
+      arenaVideoEl.pause();
+      if (!camStream) {
+        arenaVideoEl.removeAttribute("src");
+        arenaVideoEl.load();
+      }
+    }
+    if (!camStream) {
+      if (videoStageBoxEl) videoStageBoxEl.style.display = "none";
+      if (arenaStageEl) arenaStageEl.classList.remove("video-split");
+      if (videoCaptionEl) videoCaptionEl.textContent = "";
+    }
+  }
+
+  window.toggleCameraPreview = async function () {
+    if (camStream) {
+      camStream.getTracks().forEach(t => t.stop());
+      camStream = null;
+      if (arenaVideoEl) arenaVideoEl.srcObject = null;
+      if (videoStageBoxEl) videoStageBoxEl.style.display = "none";
+      if (arenaStageEl) arenaStageEl.classList.remove("video-split");
+      if (stageStatusEl) stageStatusEl.textContent = "Local camera stopped.";
+      return;
+    }
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      if (stageStatusEl) stageStatusEl.textContent = "Browser camera API not available on this device.";
+      return;
+    }
+    try {
+      camStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" }, audio: false });
+      if (arenaVideoEl) {
+        arenaVideoEl.removeAttribute("src");
+        arenaVideoEl.srcObject = camStream;
+        arenaVideoEl.muted = true;
+        arenaVideoEl.play().catch(() => {});
+      }
+      if (videoStageBoxEl) videoStageBoxEl.style.display = "flex";
+      if (arenaStageEl) arenaStageEl.classList.add("video-split");
+      if (stageStatusEl) stageStatusEl.textContent = "Local camera active on device (no frames sent to server).";
+    } catch (err) {
+      if (stageStatusEl) stageStatusEl.textContent = "Camera permission denied or unavailable.";
+    }
+  };
+
+  window.loadReplaySample = async function () {
+    try {
+      const resp = await fetch("./assets/face30.metrics.json");
+      if (!resp.ok) throw new Error("HTTP " + resp.status);
+      replayData = await resp.json();
+      const s = (replayData.samples && replayData.samples[0]) || null;
+      const r = (replayData.rates && replayData.rates[0]) || null;
+      if (s) {
+        if (telBrEl) telBrEl.textContent = typeof s.br === "number" ? s.br.toFixed(2) : "—";
+        if (telBlinkEl) telBlinkEl.textContent = s.blink ? "yes" : "no";
+        if (telTalkEl) telTalkEl.textContent = s.talk ? "yes" : "no";
+      }
+      if (telRateEl) telRateEl.textContent = r && typeof r.value === "number" ? r.value.toFixed(1) + " bpm" : "—";
+      if (stageStatusEl) {
+        stageStatusEl.textContent = "Loaded replay timeline (" + ((replayData.samples && replayData.samples.length) || 0) + " samples).";
+      }
+    } catch (e) {
+      if (stageStatusEl) stageStatusEl.textContent = "Replay metrics file unavailable.";
+    }
+  };
+
+  function updateReplayHud(elapsedMs) {
+    if (!replayData || !Array.isArray(replayData.samples) || replayData.samples.length === 0) return;
+    const samples = replayData.samples;
+    const maxT = samples[samples.length - 1].t || 1;
+    const tMs = elapsedMs % maxT;
+    let cur = samples[0];
+    for (let i = 0; i < samples.length; i++) {
+      if (samples[i].t <= tMs) cur = samples[i];
+      else break;
+    }
+    if (cur) {
+      if (telBrEl) telBrEl.textContent = typeof cur.br === "number" ? cur.br.toFixed(2) : "—";
+      if (telBlinkEl) telBlinkEl.textContent = cur.blink ? "yes" : "no";
+      if (telTalkEl) telTalkEl.textContent = cur.talk ? "yes" : "no";
+    }
+    if (Array.isArray(replayData.rates) && replayData.rates.length > 0) {
+      let rateCur = replayData.rates[0];
+      for (let j = 0; j < replayData.rates.length; j++) {
+        if (replayData.rates[j].t <= tMs) rateCur = replayData.rates[j];
+        else break;
+      }
+      if (rateCur && typeof rateCur.value === "number" && telRateEl) {
+        telRateEl.textContent = rateCur.value.toFixed(1) + " bpm";
+      }
+    }
   }
 
   function updateRoleUi() {
     const isHost = role === "host";
     if (btnStartMpEl) btnStartMpEl.disabled = !(roomCode && isHost);
-
     if (pillRoleEl) {
       if (isHost) pillRoleEl.textContent = "ROLE: 👑 ROOM MASTER";
       else if (role === "guest") pillRoleEl.textContent = "ROLE: 🎮 GUEST";
@@ -98,7 +303,7 @@
   function renderRooms() {
     if (!roomListEl) return;
     const list = Array.isArray(rooms) ? rooms : [];
-    if (roomCountEl) roomCountEl.textContent = list.length + (list.length === 1 ? " active" : " active");
+    if (roomCountEl) roomCountEl.textContent = list.length + " active";
     if (list.length === 0) {
       roomListEl.innerHTML = '<div class="muted">No active rooms available. Create one as Room Master.</div>';
       return;
@@ -120,9 +325,7 @@
       playerListEl.innerHTML = '<div class="muted">Not in a multiplayer room.</div>';
       return;
     }
-    const list = players.length > 0
-      ? players
-      : [{ name: playerName, role: role === "host" ? "host" : "guest" }];
+    const list = players.length > 0 ? players : [{ name: playerName, role: role === "host" ? "host" : "guest" }];
     playerListEl.innerHTML = list.map(p => {
       const badge = p.role === "host"
         ? '<span class="badge-master">👑 ROOM MASTER</span>'
@@ -188,7 +391,7 @@
       if (stageStatusEl) stageStatusEl.textContent = cues[slot % cues.length];
       showAlert("DISTRACTION");
     } else if (currentLevel === 3) {
-      if (stageStatusEl) stageStatusEl.textContent = "Why So Serious? Hold your focus!";
+      if (stageStatusEl) stageStatusEl.textContent = "Why So Serious? Watch & keep composure!";
       showAlert("FOCUS TEST");
     } else if (currentLevel === 4) {
       postScareUntilMs = Date.now() + 1800;
@@ -206,6 +409,8 @@
     const now = Date.now();
     const elapsed = now - roundStartMs;
     const remaining = roundEndMs - now;
+
+    updateReplayHud(elapsed);
 
     if (currentLevel >= 2) {
       const slot = Math.floor(elapsed / 5000);
@@ -225,7 +430,12 @@
   }
 
   function startRound(level, sec) {
-    currentLevel = Number(level) || 1;
+    let targetLevel = Number(level) || 1;
+    if (targetLevel === 3 && !videoPackReady && !cachedBlobUrls.length) {
+      updateAssetBannerUi(0, "Level 3 video pack (~26.8 MB) is not downloaded yet. Download it first or play Level 2.");
+    }
+
+    currentLevel = targetLevel;
     durationSec = Number(sec) || 30;
     const meta = MODE_META[currentLevel] || MODE_META[1];
 
@@ -233,6 +443,12 @@
     if (arenaTitleEl) arenaTitleEl.textContent = meta.name;
     if (arenaSubEl) arenaSubEl.textContent = meta.hint;
     if (stageStatusEl) stageStatusEl.textContent = meta.hint;
+
+    if (currentLevel === 3) {
+      playRandomLevel3Clip();
+    } else if (!camStream) {
+      stopArenaVideo();
+    }
 
     if (rafId) cancelAnimationFrame(rafId);
     roundRunning = true;
@@ -253,11 +469,19 @@
   window.selectAndLaunchMode = function (level) {
     const durEl = document.getElementById("select-duration");
     const dur = durEl ? Number(durEl.value) : 30;
+    if (Number(level) === 3 && !videoPackReady) {
+      window.setTab("lobby");
+      updateAssetBannerUi(0, "Please click 'Download Video Pack (~26.8 MB)' above before launching Level 3, or choose Level 2.");
+      if (assetBannerEl && assetBannerEl.scrollIntoView) {
+        assetBannerEl.scrollIntoView({ behavior: "smooth", block: "center" });
+      }
+      return;
+    }
     startRound(level, dur);
   };
 
   window.startSoloNow = function () {
-    window.selectAndLaunchMode(currentLevel);
+    startRound(currentLevel, durationSec);
   };
 
   window.simBlink = function () {
@@ -297,6 +521,7 @@
     roundRunning = false;
     if (rafId) { cancelAnimationFrame(rafId); rafId = null; }
     if (jumpscareLayerEl) jumpscareLayerEl.classList.remove("active");
+    stopArenaVideo();
     refreshArenaHud(0);
     if (stageStatusEl) {
       stageStatusEl.textContent = composure > 0
@@ -424,9 +649,7 @@
       updateRoleUi();
       renderPlayers();
       recordScore(playerName, 0, "host");
-      if (lobbyMsgEl) {
-        lobbyMsgEl.textContent = "👑 Room " + roomCode + " created. You are Room Master.";
-      }
+      if (lobbyMsgEl) lobbyMsgEl.textContent = "👑 Room " + roomCode + " created. You are Room Master.";
       socket.emit("get_rooms");
     });
 
@@ -475,10 +698,12 @@
 
   window.addEventListener("DOMContentLoaded", () => {
     updateRoleUi();
+    updateAssetBannerUi(0);
     renderRooms();
     renderPlayers();
     renderScoreboard();
     refreshArenaHud(30000);
+    window.loadReplaySample();
     connectSocket();
   });
 })();

@@ -6,28 +6,29 @@
   <title>Flinch Royale — Presage Party</title>
   <style>
     :root {
-      --bg: #080b10;
-      --card: #101622;
-      --card-2: #161f30;
-      --border: #243047;
+      --bg: #070a10;
+      --surface: #0f1623;
+      --surface-2: #162033;
+      --border: #24324d;
       --text: #f8fafc;
       --muted: #94a3b8;
       --green: #4ade80;
       --amber: #fbbf24;
       --coral: #f87171;
-      --purple: #a855f7;
+      --purple: #c084fc;
       --blue: #60a5fa;
     }
     * { box-sizing: border-box; }
     body {
       margin: 0;
       font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
-      background: var(--bg);
+      background: radial-gradient(circle at top, #111b2e 0%, var(--bg) 58%);
       color: var(--text);
       padding: 16px;
+      min-height: 100vh;
     }
     .shell {
-      max-width: 960px;
+      max-width: 1020px;
       margin: 0 auto;
     }
     .header {
@@ -36,15 +37,16 @@
       align-items: center;
       gap: 12px;
       flex-wrap: wrap;
-      background: var(--card);
+      background: rgba(15, 22, 35, 0.92);
       border: 1px solid var(--border);
-      border-radius: 16px;
+      border-radius: 18px;
       padding: 16px 20px;
+      box-shadow: 0 12px 32px rgba(0, 0, 0, 0.35);
     }
     .brand-title {
       margin: 0;
-      font-size: 22px;
-      font-weight: 800;
+      font-size: 23px;
+      font-weight: 900;
       letter-spacing: -0.02em;
     }
     .brand-sub {
@@ -62,8 +64,8 @@
       padding: 6px 12px;
       border-radius: 999px;
       font-size: 12px;
-      font-weight: 700;
-      background: var(--card-2);
+      font-weight: 800;
+      background: var(--surface-2);
       border: 1px solid var(--border);
       color: var(--text);
     }
@@ -75,18 +77,19 @@
       padding-bottom: 4px;
     }
     .tab {
-      background: var(--card);
+      background: var(--surface);
       color: var(--muted);
       border: 1px solid var(--border);
       border-radius: 12px;
-      padding: 10px 15px;
+      padding: 11px 16px;
       font-size: 13px;
-      font-weight: 700;
+      font-weight: 800;
       cursor: pointer;
       white-space: nowrap;
+      transition: all 0.15s ease;
     }
     .tab.active {
-      background: #1d4ed8;
+      background: linear-gradient(135deg, #2563eb, #1d4ed8);
       color: #ffffff;
       border-color: var(--blue);
     }
@@ -98,11 +101,12 @@
       gap: 14px;
     }
     .card {
-      background: var(--card);
+      background: rgba(15, 22, 35, 0.92);
       border: 1px solid var(--border);
-      border-radius: 16px;
+      border-radius: 18px;
       padding: 18px;
       margin-bottom: 14px;
+      box-shadow: 0 10px 24px rgba(0, 0, 0, 0.25);
     }
     .card-head {
       display: flex;
@@ -124,27 +128,70 @@
       background: var(--bg);
       color: var(--text);
       border: 1px solid var(--border);
-      border-radius: 10px;
-      padding: 10px 12px;
+      border-radius: 11px;
+      padding: 11px 13px;
       font-size: 14px;
     }
     .btn {
       border: 1px solid var(--border);
-      background: var(--card-2);
+      background: var(--surface-2);
       color: var(--text);
-      border-radius: 10px;
-      padding: 10px 14px;
+      border-radius: 11px;
+      padding: 11px 15px;
       font-size: 13px;
-      font-weight: 700;
+      font-weight: 800;
       cursor: pointer;
+      transition: transform 0.12s ease, opacity 0.15s ease;
     }
+    .btn:active { transform: scale(0.98); }
     .btn:disabled { opacity: 0.45; cursor: not-allowed; }
-    .btn-m1 { border-color: var(--green); color: var(--green); }
-    .btn-m2 { border-color: var(--amber); color: var(--amber); }
-    .btn-m3 { border-color: var(--coral); color: var(--coral); }
-    .btn-m4 { border-color: var(--purple); color: #d8b4fe; }
+    .btn-m1 { border-color: rgba(74, 222, 128, 0.55); color: var(--green); }
+    .btn-m2 { border-color: rgba(251, 191, 36, 0.55); color: var(--amber); }
+    .btn-m3 { border-color: rgba(248, 113, 113, 0.55); color: var(--coral); }
+    .btn-m4 { border-color: rgba(192, 132, 252, 0.6); color: var(--purple); }
     .btn-primary { background: #16a34a; border-color: #22c55e; color: #fff; }
     .btn-danger { background: #991b1b; border-color: #ef4444; color: #fff; }
+
+    .download-banner {
+      background: rgba(251, 191, 36, 0.09);
+      border: 1px solid rgba(251, 191, 36, 0.45);
+      border-radius: 14px;
+      padding: 14px 16px;
+      margin-bottom: 14px;
+    }
+    .download-banner.ready {
+      background: rgba(74, 222, 128, 0.08);
+      border-color: rgba(74, 222, 128, 0.45);
+    }
+    .download-title {
+      font-size: 13px;
+      font-weight: 900;
+      color: var(--amber);
+      margin-bottom: 4px;
+    }
+    .download-banner.ready .download-title { color: var(--green); }
+    .download-desc {
+      font-size: 12px;
+      color: #cbd5e1;
+      line-height: 1.5;
+      margin-bottom: 10px;
+    }
+    .progress-track {
+      width: 100%;
+      height: 8px;
+      border-radius: 999px;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      overflow: hidden;
+      margin-bottom: 10px;
+    }
+    .progress-fill {
+      height: 100%;
+      width: 0%;
+      background: linear-gradient(90deg, #fbbf24, #4ade80);
+      transition: width 0.2s ease;
+    }
+
     .mode-grid {
       display: grid;
       grid-template-columns: repeat(2, 1fr);
@@ -153,29 +200,30 @@
     }
     .mode-btn {
       text-align: left;
-      padding: 12px 14px;
-      border-radius: 12px;
-      background: var(--card-2);
+      padding: 14px;
+      border-radius: 13px;
+      background: var(--surface-2);
       border: 1px solid var(--border);
       cursor: pointer;
       color: var(--text);
     }
-    .mode-btn strong { display: block; font-size: 14px; margin-bottom: 3px; }
-    .mode-btn span { display: block; font-size: 12px; color: var(--muted); }
+    .mode-btn strong { display: block; font-size: 14px; margin-bottom: 4px; }
+    .mode-btn span { display: block; font-size: 12px; color: var(--muted); line-height: 1.4; }
+
     .room-item, .player-item, .score-item {
       display: flex;
       justify-content: space-between;
       align-items: center;
       gap: 10px;
-      padding: 10px 12px;
-      border-radius: 11px;
-      background: var(--card-2);
+      padding: 11px 13px;
+      border-radius: 12px;
+      background: var(--surface-2);
       border: 1px solid var(--border);
       margin-top: 8px;
       font-size: 13px;
     }
     .badge-master {
-      padding: 3px 9px;
+      padding: 4px 10px;
       border-radius: 999px;
       font-size: 11px;
       font-weight: 800;
@@ -184,7 +232,7 @@
       border: 1px solid rgba(251, 191, 36, 0.45);
     }
     .badge-guest {
-      padding: 3px 9px;
+      padding: 4px 10px;
       border-radius: 999px;
       font-size: 11px;
       font-weight: 800;
@@ -192,10 +240,11 @@
       color: var(--blue);
       border: 1px solid rgba(96, 165, 250, 0.45);
     }
+
     .composure-wrap { margin-bottom: 14px; }
     .composure-track {
       width: 100%;
-      height: 22px;
+      height: 24px;
       border-radius: 999px;
       background: var(--bg);
       border: 1px solid var(--border);
@@ -214,27 +263,51 @@
       margin-bottom: 14px;
     }
     .metric-card {
-      background: var(--card-2);
+      background: var(--surface-2);
       border: 1px solid var(--border);
-      border-radius: 12px;
+      border-radius: 13px;
       padding: 12px;
       text-align: center;
     }
     .metric-lbl { font-size: 11px; color: var(--muted); }
     .metric-val { font-size: 22px; font-weight: 900; margin-top: 4px; color: var(--green); }
+
     .stage {
       position: relative;
-      min-height: 220px;
-      border-radius: 14px;
+      min-height: 260px;
+      border-radius: 16px;
       border: 1px solid var(--border);
-      background: radial-gradient(circle at center, #172033 0%, #090d14 100%);
-      padding: 20px;
+      background: radial-gradient(circle at center, #172238 0%, #080c14 100%);
+      padding: 18px;
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 14px;
+      align-items: center;
+      overflow: hidden;
+    }
+    .stage.video-split {
+      grid-template-columns: 1.25fr 0.75fr;
+    }
+    .video-box {
+      width: 100%;
+      border-radius: 12px;
+      overflow: hidden;
+      background: #000;
+      border: 1px solid var(--border);
+      aspect-ratio: 16 / 9;
       display: flex;
-      flex-direction: column;
       align-items: center;
       justify-content: center;
+    }
+    .video-box video {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+    }
+    .stage-hud {
       text-align: center;
-      overflow: hidden;
+      padding: 8px;
     }
     .stage-timer {
       font-size: 56px;
@@ -250,16 +323,17 @@
     }
     .alert-pop {
       position: absolute;
-      top: 16px;
-      right: 16px;
+      top: 14px;
+      right: 14px;
       padding: 6px 12px;
       border-radius: 999px;
       font-size: 12px;
       font-weight: 900;
-      background: rgba(239, 68, 68, 0.2);
+      background: rgba(239, 68, 68, 0.22);
       color: #fca5a5;
-      border: 1px solid rgba(239, 68, 68, 0.5);
+      border: 1px solid rgba(239, 68, 68, 0.55);
       opacity: 0;
+      z-index: 6;
       transition: opacity 0.2s ease;
     }
     .alert-pop.show { opacity: 1; }
@@ -267,27 +341,42 @@
       display: none;
       position: absolute;
       inset: 0;
-      background: rgba(185, 28, 28, 0.92);
+      background: rgba(185, 28, 28, 0.94);
       align-items: center;
       justify-content: center;
-      font-size: 84px;
-      z-index: 5;
+      font-size: 88px;
+      z-index: 8;
     }
     .jumpscare-layer.active { display: flex; }
+
+    .telemetry-strip {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 8px;
+      margin-top: 12px;
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      font-size: 12px;
+    }
+    .tel-cell {
+      background: var(--surface-2);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 9px 10px;
+      color: #cbd5e1;
+    }
     .info-box {
-      background: var(--card-2);
+      background: var(--surface-2);
       border: 1px solid var(--border);
       border-radius: 12px;
-      padding: 12px 14px;
+      padding: 13px 15px;
       font-size: 12px;
       color: var(--muted);
-      line-height: 1.55;
+      line-height: 1.6;
     }
     .muted { color: var(--muted); font-size: 13px; }
-    @media (max-width: 740px) {
-      .grid-2 { grid-template-columns: 1fr; }
-      .mode-grid { grid-template-columns: 1fr; }
-      .hud-grid { grid-template-columns: repeat(2, 1fr); }
+    @media (max-width: 760px) {
+      .grid-2, .mode-grid, .stage.video-split { grid-template-columns: 1fr; }
+      .hud-grid, .telemetry-strip { grid-template-columns: repeat(2, 1fr); }
     }
   </style>
 </head>
@@ -311,13 +400,13 @@
       <button type="button" class="tab" data-tab="privacy" onclick="window.setTab('privacy')">4. Consent &amp; Data</button>
     </nav>
 
-    <!-- TAB 1: LOBBY & HOST (FRONT VIEW) -->
+    <!-- TAB 1: LOBBY & HOST -->
     <section id="panel-lobby" class="panel active">
       <div class="grid-2">
         <div class="card">
           <div class="card-head">
             <span>Game Host &amp; Room</span>
-            <span class="badge-master" id="host-status-badge">SOLO / HOST</span>
+            <span class="badge-master" id="host-status-badge">HOST CONTROL</span>
           </div>
           <div class="row">
             <input id="input-name" type="text" placeholder="Player Name" value="Jack" style="flex:1;min-width:130px;" />
@@ -362,6 +451,21 @@
           <span>Flinch Royale Modes (4 Levels)</span>
           <span class="muted">Composure 100% -> 0% · Score = Composure x 10 (max 1000)</span>
         </div>
+
+        <div class="download-banner" id="asset-banner">
+          <div class="download-title" id="asset-banner-title">Data Download Notice — Level 3 Video Pack (~26.8 MB)</div>
+          <div class="download-desc" id="asset-banner-desc">
+            Level 3 ("Why So Serious?") plays 8 distraction video clips (<code>distraction_1.mp4</code> – <code>distraction_8.mp4</code>, ~26.8 MB total). Download/cache the pack before Level 3, or continue with Level 2 ("Seriously?") to save mobile data.
+          </div>
+          <div class="progress-track">
+            <div class="progress-fill" id="asset-progress-bar"></div>
+          </div>
+          <div class="row" style="margin-bottom:0;">
+            <button type="button" class="btn btn-m2" id="btn-download-assets" onclick="window.downloadVideoPack()">Download Video Pack (~26.8 MB)</button>
+            <button type="button" class="btn" onclick="window.selectAndLaunchMode(2)">Use Level 2 Instead (No Video Download)</button>
+          </div>
+        </div>
+
         <div class="mode-grid">
           <button type="button" class="mode-btn btn-m1" onclick="window.selectAndLaunchMode(1)">
             <strong>1. Chill Mode</strong>
@@ -373,7 +477,7 @@
           </button>
           <button type="button" class="mode-btn btn-m3" onclick="window.selectAndLaunchMode(3)">
             <strong>3. Why So Serious?</strong>
-            <span>High-focus distraction challenge without skip shortcuts.</span>
+            <span>Video distraction challenge (~26.8 MB pack; auto-fallback if unavailable).</span>
           </button>
           <button type="button" class="mode-btn btn-m4" onclick="window.selectAndLaunchMode(4)">
             <strong>4. Don't Scream</strong>
@@ -411,12 +515,29 @@
         <div class="stage" id="arena-stage">
           <div class="alert-pop" id="alert-badge">FLINCH!</div>
           <div class="jumpscare-layer" id="jumpscare-layer">😱</div>
-          <div class="stage-timer" id="stage-timer">30</div>
-          <div class="stage-status" id="stage-status">Select a mode or start from Room Master</div>
+
+          <div class="video-box" id="video-stage-box" style="display:none;">
+            <video id="arena-video" playsinline controls></video>
+          </div>
+
+          <div class="stage-hud">
+            <div class="stage-timer" id="stage-timer">30</div>
+            <div class="stage-status" id="stage-status">Select a mode or start from Room Master</div>
+            <div class="muted" id="video-caption" style="margin-top:6px;"></div>
+          </div>
+        </div>
+
+        <div class="telemetry-strip">
+          <div class="tel-cell">Replay br: <strong id="tel-br">—</strong></div>
+          <div class="tel-cell">Replay rate: <strong id="tel-rate">—</strong></div>
+          <div class="tel-cell">Replay blink: <strong id="tel-blink">—</strong></div>
+          <div class="tel-cell">Replay talk: <strong id="tel-talk">—</strong></div>
         </div>
 
         <div class="row" style="margin-top:14px;margin-bottom:0;">
           <button type="button" class="btn btn-primary" onclick="window.startSoloNow()">Start Solo Mode</button>
+          <button type="button" class="btn" id="btn-cam" onclick="window.toggleCameraPreview()">Local Camera (Opt)</button>
+          <button type="button" class="btn" onclick="window.loadReplaySample()">Load Replay Metrics</button>
           <button type="button" class="btn btn-m2" onclick="window.simBlink()">Log Blink (-4)</button>
           <button type="button" class="btn btn-m3" onclick="window.simTalk()">Log Talk (-8)</button>
           <button type="button" class="btn btn-danger" onclick="window.endRound(true)">Finish &amp; Submit</button>
@@ -442,14 +563,14 @@
         <div class="info-box">
           <strong>Presage SmartSpectra &amp; Data Transparency:</strong><br/>
           - Built for the Presage SmartSpectra SDK Challenge (Flinch Royale). No medical diagnosis, treatment, or health-condition claims are made.<br/>
-          - In the desktop pipeline, SmartSpectra processes video with telemetry disabled (<code>enableTelemetry = false</code>) and exports derived metrics (breathing, blink, talk) without storing raw video on a server.<br/>
-          - In this web client, multiplayer room codes, player names, round state, and reported scores are sent to the Socket.IO server to coordinate matches; no biometric video frames are uploaded to the server.
+          - SmartSpectra SDK runs with telemetry disabled (<code>enableTelemetry = false</code>) and exports derived signals (breathing, blink, talk) without storing raw video on a server.<br/>
+          - Optional Local Camera in the browser stays local to your device; multiplayer room codes, names, round state, and reported scores coordinate matches via Socket.IO.
         </div>
       </div>
     </section>
   </div>
 
   <script src="./socket.io.min.js"></script>
-  <script src="./web-client.js?v=20261122d"></script>
+  <script src="./web-client.js?v=20261122e"></script>
 </body>
 </html>

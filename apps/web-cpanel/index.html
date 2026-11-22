@@ -3,19 +3,20 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Presage Party — SmartSpectra Multiplayer</title>
+  <title>Flinch Royale — Presage Party</title>
   <style>
     :root {
-      --bg: #090c12;
-      --surface: #111622;
-      --surface-2: #171e2e;
-      --border: #253047;
-      --text: #f1f5f9;
+      --bg: #080b10;
+      --card: #101622;
+      --card-2: #161f30;
+      --border: #243047;
+      --text: #f8fafc;
       --muted: #94a3b8;
-      --accent: #3b82f6;
-      --accent-2: #10b981;
-      --warn: #f59e0b;
-      --danger: #ef4444;
+      --green: #4ade80;
+      --amber: #fbbf24;
+      --coral: #f87171;
+      --purple: #a855f7;
+      --blue: #60a5fa;
     }
     * { box-sizing: border-box; }
     body {
@@ -25,312 +26,430 @@
       color: var(--text);
       padding: 16px;
     }
-    .app {
-      max-width: 920px;
+    .shell {
+      max-width: 960px;
       margin: 0 auto;
     }
-    .topbar {
+    .header {
       display: flex;
       justify-content: space-between;
       align-items: center;
       gap: 12px;
       flex-wrap: wrap;
-      background: var(--surface);
+      background: var(--card);
       border: 1px solid var(--border);
-      border-radius: 14px;
-      padding: 16px 18px;
+      border-radius: 16px;
+      padding: 16px 20px;
     }
-    h1 { margin: 0; font-size: 20px; letter-spacing: -0.01em; }
-    .sub { font-size: 12px; color: var(--muted); margin-top: 3px; }
-    .pill {
-      display: inline-flex;
+    .brand-title {
+      margin: 0;
+      font-size: 22px;
+      font-weight: 800;
+      letter-spacing: -0.02em;
+    }
+    .brand-sub {
+      margin-top: 4px;
+      font-size: 12px;
+      color: var(--muted);
+    }
+    .badges {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
       align-items: center;
-      gap: 6px;
+    }
+    .pill {
       padding: 6px 12px;
       border-radius: 999px;
       font-size: 12px;
       font-weight: 700;
-      background: var(--surface-2);
+      background: var(--card-2);
       border: 1px solid var(--border);
+      color: var(--text);
     }
-    .tabs {
+    .tabbar {
       display: flex;
       gap: 8px;
       overflow-x: auto;
       margin: 14px 0;
       padding-bottom: 4px;
     }
-    .tab-btn {
-      background: var(--surface);
+    .tab {
+      background: var(--card);
       color: var(--muted);
       border: 1px solid var(--border);
-      padding: 10px 14px;
-      border-radius: 10px;
-      font-weight: 700;
+      border-radius: 12px;
+      padding: 10px 15px;
       font-size: 13px;
+      font-weight: 700;
       cursor: pointer;
       white-space: nowrap;
     }
-    .tab-btn.active {
-      background: var(--accent);
-      color: #fff;
-      border-color: #60a5fa;
+    .tab.active {
+      background: #1d4ed8;
+      color: #ffffff;
+      border-color: var(--blue);
     }
-    .tab-panel { display: none; }
-    .tab-panel.active { display: block; }
+    .panel { display: none; }
+    .panel.active { display: block; }
     .grid-2 {
       display: grid;
-      grid-template-columns: 1fr 1fr;
+      grid-template-columns: 1.05fr 0.95fr;
       gap: 14px;
     }
     .card {
-      background: var(--surface);
+      background: var(--card);
       border: 1px solid var(--border);
-      border-radius: 14px;
-      padding: 16px;
+      border-radius: 16px;
+      padding: 18px;
       margin-bottom: 14px;
     }
-    .card-title {
-      font-size: 15px;
-      font-weight: 800;
-      margin: 0 0 10px;
+    .card-head {
       display: flex;
       justify-content: space-between;
       align-items: center;
+      gap: 8px;
+      margin-bottom: 12px;
+      font-size: 15px;
+      font-weight: 800;
     }
-    .row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+    .row {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      align-items: center;
+      margin-bottom: 10px;
+    }
     input, select {
       background: var(--bg);
       color: var(--text);
       border: 1px solid var(--border);
-      border-radius: 9px;
+      border-radius: 10px;
       padding: 10px 12px;
       font-size: 14px;
     }
-    button {
-      background: var(--accent);
-      color: #fff;
-      border: none;
-      border-radius: 9px;
+    .btn {
+      border: 1px solid var(--border);
+      background: var(--card-2);
+      color: var(--text);
+      border-radius: 10px;
       padding: 10px 14px;
       font-size: 13px;
       font-weight: 700;
       cursor: pointer;
     }
-    button:disabled { opacity: 0.45; cursor: not-allowed; }
-    button.secondary { background: var(--surface-2); border: 1px solid var(--border); color: var(--text); }
-    button.success { background: #059669; }
-    button.danger { background: #b91c1c; }
-    .room-row, .player-row, .score-row {
+    .btn:disabled { opacity: 0.45; cursor: not-allowed; }
+    .btn-m1 { border-color: var(--green); color: var(--green); }
+    .btn-m2 { border-color: var(--amber); color: var(--amber); }
+    .btn-m3 { border-color: var(--coral); color: var(--coral); }
+    .btn-m4 { border-color: var(--purple); color: #d8b4fe; }
+    .btn-primary { background: #16a34a; border-color: #22c55e; color: #fff; }
+    .btn-danger { background: #991b1b; border-color: #ef4444; color: #fff; }
+    .mode-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 10px;
+      margin-top: 8px;
+    }
+    .mode-btn {
+      text-align: left;
+      padding: 12px 14px;
+      border-radius: 12px;
+      background: var(--card-2);
+      border: 1px solid var(--border);
+      cursor: pointer;
+      color: var(--text);
+    }
+    .mode-btn strong { display: block; font-size: 14px; margin-bottom: 3px; }
+    .mode-btn span { display: block; font-size: 12px; color: var(--muted); }
+    .room-item, .player-item, .score-item {
       display: flex;
       justify-content: space-between;
       align-items: center;
+      gap: 10px;
       padding: 10px 12px;
-      border-radius: 10px;
-      background: var(--surface-2);
+      border-radius: 11px;
+      background: var(--card-2);
       border: 1px solid var(--border);
       margin-top: 8px;
       font-size: 13px;
     }
     .badge-master {
-      background: rgba(245, 158, 11, 0.16);
-      color: #fcd34d;
-      border: 1px solid rgba(245, 158, 11, 0.45);
       padding: 3px 9px;
       border-radius: 999px;
       font-size: 11px;
       font-weight: 800;
+      background: rgba(251, 191, 36, 0.16);
+      color: var(--amber);
+      border: 1px solid rgba(251, 191, 36, 0.45);
     }
     .badge-guest {
-      background: rgba(59, 130, 246, 0.16);
-      color: #93c5fd;
-      border: 1px solid rgba(59, 130, 246, 0.45);
       padding: 3px 9px;
       border-radius: 999px;
       font-size: 11px;
       font-weight: 800;
+      background: rgba(96, 165, 250, 0.16);
+      color: var(--blue);
+      border: 1px solid rgba(96, 165, 250, 0.45);
     }
-    .hud-4 {
+    .composure-wrap { margin-bottom: 14px; }
+    .composure-track {
+      width: 100%;
+      height: 22px;
+      border-radius: 999px;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      overflow: hidden;
+    }
+    .composure-fill {
+      height: 100%;
+      width: 100%;
+      background: var(--green);
+      transition: width 0.12s linear, background-color 0.25s ease;
+    }
+    .hud-grid {
       display: grid;
       grid-template-columns: repeat(4, 1fr);
       gap: 10px;
-      margin: 10px 0 12px;
+      margin-bottom: 14px;
     }
-    .stat-box {
-      background: var(--surface-2);
+    .metric-card {
+      background: var(--card-2);
       border: 1px solid var(--border);
-      border-radius: 10px;
-      padding: 10px;
+      border-radius: 12px;
+      padding: 12px;
       text-align: center;
     }
-    .stat-label { font-size: 11px; color: var(--muted); }
-    .stat-val { font-size: 20px; font-weight: 800; color: #34d399; margin-top: 2px; }
-    .arena {
+    .metric-lbl { font-size: 11px; color: var(--muted); }
+    .metric-val { font-size: 22px; font-weight: 900; margin-top: 4px; color: var(--green); }
+    .stage {
       position: relative;
-      height: 220px;
-      border-radius: 12px;
+      min-height: 220px;
+      border-radius: 14px;
       border: 1px solid var(--border);
-      background: radial-gradient(circle at center, #182338 0%, #090d14 100%);
-      overflow: hidden;
-    }
-    .orb {
-      position: absolute;
-      left: 50%;
-      top: 50%;
-      transform: translate(-50%, -50%);
-      width: 68px;
-      height: 68px;
-      border-radius: 50%;
-      background: var(--accent-2);
-      color: #042f2e;
-      font-weight: 900;
-      font-size: 12px;
+      background: radial-gradient(circle at center, #172033 0%, #090d14 100%);
+      padding: 20px;
       display: flex;
+      flex-direction: column;
       align-items: center;
       justify-content: center;
       text-align: center;
-      cursor: pointer;
-      box-shadow: 0 0 20px rgba(16, 185, 129, 0.45);
+      overflow: hidden;
     }
-    video {
-      width: 100%;
-      max-height: 240px;
-      border-radius: 10px;
-      background: #000;
+    .stage-timer {
+      font-size: 56px;
+      font-weight: 900;
+      font-variant-numeric: tabular-nums;
+      line-height: 1.05;
+    }
+    .stage-status {
+      margin-top: 10px;
+      font-size: 15px;
+      font-weight: 700;
+      color: #e2e8f0;
+    }
+    .alert-pop {
+      position: absolute;
+      top: 16px;
+      right: 16px;
+      padding: 6px 12px;
+      border-radius: 999px;
+      font-size: 12px;
+      font-weight: 900;
+      background: rgba(239, 68, 68, 0.2);
+      color: #fca5a5;
+      border: 1px solid rgba(239, 68, 68, 0.5);
+      opacity: 0;
+      transition: opacity 0.2s ease;
+    }
+    .alert-pop.show { opacity: 1; }
+    .jumpscare-layer {
+      display: none;
+      position: absolute;
+      inset: 0;
+      background: rgba(185, 28, 28, 0.92);
+      align-items: center;
+      justify-content: center;
+      font-size: 84px;
+      z-index: 5;
+    }
+    .jumpscare-layer.active { display: flex; }
+    .info-box {
+      background: var(--card-2);
       border: 1px solid var(--border);
-    }
-    .notice {
+      border-radius: 12px;
+      padding: 12px 14px;
       font-size: 12px;
       color: var(--muted);
-      line-height: 1.5;
-      background: var(--surface-2);
-      border: 1px solid var(--border);
-      border-radius: 10px;
-      padding: 10px 12px;
-      margin-top: 10px;
+      line-height: 1.55;
     }
-    @media (max-width: 720px) {
+    .muted { color: var(--muted); font-size: 13px; }
+    @media (max-width: 740px) {
       .grid-2 { grid-template-columns: 1fr; }
-      .hud-4 { grid-template-columns: repeat(2, 1fr); }
+      .mode-grid { grid-template-columns: 1fr; }
+      .hud-grid { grid-template-columns: repeat(2, 1fr); }
     }
   </style>
 </head>
 <body>
-  <div class="app">
-    <div class="topbar">
+  <div class="shell">
+    <header class="header">
       <div>
-        <h1>Presage Party</h1>
-        <div class="sub" id="server-status-line">Connecting to primary server...</div>
+        <h1 class="brand-title">Flinch Royale</h1>
+        <div class="brand-sub" id="conn-status">Connecting to multiplayer server...</div>
       </div>
-      <div class="row" style="margin:0;">
-        <span class="pill" id="cam-pill">CAM: OFF</span>
-        <span class="pill" id="host-pill">ROLE: SOLO</span>
+      <div class="badges">
+        <span class="pill" id="pill-mode">MODE: CHILL MODE</span>
+        <span class="pill" id="pill-role">ROLE: SOLO</span>
       </div>
-    </div>
+    </header>
 
-    <div class="tabs" role="tablist">
-      <button type="button" class="tab-btn active" data-tab="lobby" onclick="window.switchTab('lobby')">1. Lobby &amp; Rooms</button>
-      <button type="button" class="tab-btn" data-tab="camera" onclick="window.switchTab('camera')">2. Camera &amp; Signals</button>
-      <button type="button" class="tab-btn" data-tab="arena" onclick="window.switchTab('arena')">3. Game Arena</button>
-      <button type="button" class="tab-btn" data-tab="scoreboard" onclick="window.switchTab('scoreboard')">4. Scoreboard</button>
-    </div>
+    <nav class="tabbar" aria-label="Primary Sections">
+      <button type="button" class="tab active" data-tab="lobby" onclick="window.setTab('lobby')">1. Lobby &amp; Host</button>
+      <button type="button" class="tab" data-tab="arena" onclick="window.setTab('arena')">2. Game Arena</button>
+      <button type="button" class="tab" data-tab="scoreboard" onclick="window.setTab('scoreboard')">3. Scoreboard</button>
+      <button type="button" class="tab" data-tab="privacy" onclick="window.setTab('privacy')">4. Consent &amp; Data</button>
+    </nav>
 
-    <!-- TAB 1: LOBBY & ROOMS (FRONT VIEW) -->
-    <section id="tab-lobby" class="tab-panel active">
+    <!-- TAB 1: LOBBY & HOST (FRONT VIEW) -->
+    <section id="panel-lobby" class="panel active">
       <div class="grid-2">
         <div class="card">
-          <div class="card-title"><span>Game Host Control</span><span class="badge-master" id="host-badge-small">HOST READY</span></div>
-          <div class="row" style="margin-bottom:10px;">
-            <input id="player-name" type="text" placeholder="Your Name" value="Jack" style="flex:1;min-width:140px;" />
-            <button type="button" class="success" onclick="window.createGameRoom()">Create Room</button>
-          </div>
-          <div class="row" style="margin-bottom:10px;">
-            <input id="room-code-input" type="text" placeholder="Room Code" maxlength="8" style="width:130px;text-transform:uppercase;" />
-            <button type="button" onclick="window.joinGameRoom()">Join Room</button>
-            <button type="button" class="secondary" onclick="window.refreshRooms()">Refresh</button>
+          <div class="card-head">
+            <span>Game Host &amp; Room</span>
+            <span class="badge-master" id="host-status-badge">SOLO / HOST</span>
           </div>
           <div class="row">
-            <select id="game-mode-select">
-              <option value="signal-focus">Signal Focus (Pulse &amp; Calm)</option>
-              <option value="breath-pace">Breath &amp; HR Pace</option>
-              <option value="flinch-challenge">Flinch &amp; Expression</option>
-            </select>
-            <select id="game-duration-select">
-              <option value="15">15s</option>
-              <option value="30" selected>30s</option>
-              <option value="60">60s</option>
-            </select>
-            <button type="button" id="btn-host-start" class="success" onclick="window.hostStartGame()">Start Game</button>
+            <input id="input-name" type="text" placeholder="Player Name" value="Jack" style="flex:1;min-width:130px;" />
+            <button type="button" id="btn-create" class="btn btn-primary" onclick="window.createRoom()">Create Room</button>
           </div>
-          <div class="notice" id="lobby-feedback">Create a room as Room Master or join an active room below.</div>
+          <div class="row">
+            <input id="input-code" type="text" placeholder="Room Code" maxlength="6" style="width:120px;text-transform:uppercase;" />
+            <input id="input-pass" type="password" placeholder="Pass (opt)" style="width:110px;" />
+            <button type="button" id="btn-join" class="btn btn-m2" onclick="window.joinRoom()">Join</button>
+            <button type="button" class="btn" onclick="window.refreshRooms()">Refresh</button>
+          </div>
+          <div class="row" style="margin-bottom:0;">
+            <select id="select-duration">
+              <option value="30" selected>30s Round</option>
+              <option value="60">60s Round</option>
+              <option value="180">180s Round</option>
+            </select>
+            <button type="button" id="btn-start-mp" class="btn btn-primary" onclick="window.startMultiplayerRound()" disabled>Start Room Game (Host)</button>
+          </div>
+          <div class="info-box" id="lobby-msg" style="margin-top:12px;">
+            Create a room as Room Master or join an active room from the list.
+          </div>
         </div>
 
         <div class="card">
-          <div class="card-title"><span>Active Rooms</span><span id="room-count-label" class="sub">0 rooms</span></div>
-          <div id="active-rooms-list">
-            <div class="sub">Checking active rooms...</div>
+          <div class="card-head">
+            <span>Active Rooms</span>
+            <span class="muted" id="room-count">0 active</span>
           </div>
-          <div class="card-title" style="margin-top:16px;"><span>Room Players</span></div>
-          <div id="room-players-list">
-            <div class="sub">No room joined yet.</div>
+          <div id="room-list"><div class="muted">No active rooms listed yet.</div></div>
+
+          <div class="card-head" style="margin-top:18px;">
+            <span>Room Players</span>
+            <span class="muted" id="active-room-code">-</span>
+          </div>
+          <div id="player-list"><div class="muted">Not in a multiplayer room.</div></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-head">
+          <span>Flinch Royale Modes (4 Levels)</span>
+          <span class="muted">Composure 100% -> 0% · Score = Composure x 10 (max 1000)</span>
+        </div>
+        <div class="mode-grid">
+          <button type="button" class="mode-btn btn-m1" onclick="window.selectAndLaunchMode(1)">
+            <strong>1. Chill Mode</strong>
+            <span>Baseline composure test with no external distractions.</span>
+          </button>
+          <button type="button" class="mode-btn btn-m2" onclick="window.selectAndLaunchMode(2)">
+            <strong>2. Seriously?</strong>
+            <span>Audio &amp; visual prompts designed to break your focus.</span>
+          </button>
+          <button type="button" class="mode-btn btn-m3" onclick="window.selectAndLaunchMode(3)">
+            <strong>3. Why So Serious?</strong>
+            <span>High-focus distraction challenge without skip shortcuts.</span>
+          </button>
+          <button type="button" class="mode-btn btn-m4" onclick="window.selectAndLaunchMode(4)">
+            <strong>4. Don't Scream</strong>
+            <span>Sudden scare cues; post-scare flinches hit composure harder.</span>
+          </button>
+        </div>
+      </div>
+    </section>
+
+    <!-- TAB 2: GAME ARENA -->
+    <section id="panel-arena" class="panel">
+      <div class="card">
+        <div class="card-head">
+          <span id="arena-title">Chill Mode</span>
+          <span class="muted" id="arena-sub">Ready when round starts</span>
+        </div>
+
+        <div class="composure-wrap">
+          <div class="composure-track">
+            <div class="composure-fill" id="composure-bar"></div>
+          </div>
+          <div class="row" style="justify-content:space-between;margin-top:8px;margin-bottom:0;">
+            <strong id="composure-text">COMPOSURE 100%</strong>
+            <span class="muted" id="penalty-counters">blinks: 0 · talks: 0 · rate: 0</span>
           </div>
         </div>
-      </div>
-    </section>
 
-    <!-- TAB 2: CAMERA & PRESAGE SMARTSPECTRA SIGNALS -->
-    <section id="tab-camera" class="tab-panel">
-      <div class="card">
-        <div class="card-title"><span>Camera &amp; Real-Time Signal Stream</span></div>
-        <div class="row" style="margin-bottom:10px;">
-          <button type="button" class="success" onclick="window.enableCamera()">Enable Camera</button>
-          <button type="button" class="secondary" onclick="window.disableCamera()">Stop Camera</button>
+        <div class="hud-grid">
+          <div class="metric-card"><div class="metric-lbl">Time Left</div><div class="metric-val" id="hud-time">30s</div></div>
+          <div class="metric-card"><div class="metric-lbl">Score</div><div class="metric-val" id="hud-score">0</div></div>
+          <div class="metric-card"><div class="metric-lbl">Blinks (-4)</div><div class="metric-val" id="hud-blinks">0</div></div>
+          <div class="metric-card"><div class="metric-lbl">Talks (-8)</div><div class="metric-val" id="hud-talks">0</div></div>
         </div>
-        <video id="camera-video" autoplay playsinline muted></video>
-        <div class="hud-4" style="margin-top:12px;">
-          <div class="stat-box"><div class="stat-label">Pulse (BPM)</div><div class="stat-val" id="sig-pulse">--</div></div>
-          <div class="stat-box"><div class="stat-label">Breathing (/m)</div><div class="stat-val" id="sig-breath">--</div></div>
-          <div class="stat-box"><div class="stat-label">HRV (ms)</div><div class="stat-val" id="sig-hrv">--</div></div>
-          <div class="stat-box"><div class="stat-label">Signal Source</div><div class="stat-val" id="sig-source" style="font-size:14px;">Camera Req</div></div>
-        </div>
-        <div class="notice">
-          <strong>Consent &amp; Data Notice:</strong> Camera access is used to capture real-time visual signals for Presage SmartSpectra experience responsiveness. No medical diagnosis or treatment claims are made. Enable your camera to drive live signal metrics.
-        </div>
-      </div>
-    </section>
 
-    <!-- TAB 3: GAME ARENA -->
-    <section id="tab-arena" class="tab-panel">
-      <div class="card">
-        <div class="card-title"><span id="arena-mode-title">Mode: Signal Focus</span><span id="arena-prompt" class="sub">Waiting for Room Master to start</span></div>
-        <div class="hud-4">
-          <div class="stat-box"><div class="stat-label">Time Left</div><div class="stat-val" id="hud-time">30.0s</div></div>
-          <div class="stat-box"><div class="stat-label">Composure</div><div class="stat-val" id="hud-composure">100</div></div>
-          <div class="stat-box"><div class="stat-label">Score</div><div class="stat-val" id="hud-score">0</div></div>
-          <div class="stat-box"><div class="stat-label">Signals</div><div class="stat-val" id="hud-signals">0</div></div>
+        <div class="stage" id="arena-stage">
+          <div class="alert-pop" id="alert-badge">FLINCH!</div>
+          <div class="jumpscare-layer" id="jumpscare-layer">😱</div>
+          <div class="stage-timer" id="stage-timer">30</div>
+          <div class="stage-status" id="stage-status">Select a mode or start from Room Master</div>
         </div>
-        <div class="arena" id="game-arena">
-          <div class="orb" id="focus-orb" onclick="window.tapTarget()">PULSE<br/>SYNC</div>
-        </div>
-        <div class="row" style="margin-top:12px;">
-          <button type="button" id="btn-arena-start" class="success" onclick="window.hostStartGame()">Start Round (Host)</button>
-          <button type="button" class="danger" onclick="window.finishRound(true)">Finish &amp; Submit Score</button>
+
+        <div class="row" style="margin-top:14px;margin-bottom:0;">
+          <button type="button" class="btn btn-primary" onclick="window.startSoloNow()">Start Solo Mode</button>
+          <button type="button" class="btn btn-m2" onclick="window.simBlink()">Log Blink (-4)</button>
+          <button type="button" class="btn btn-m3" onclick="window.simTalk()">Log Talk (-8)</button>
+          <button type="button" class="btn btn-danger" onclick="window.endRound(true)">Finish &amp; Submit</button>
         </div>
       </div>
     </section>
 
-    <!-- TAB 4: SCOREBOARD -->
-    <section id="tab-scoreboard" class="tab-panel">
+    <!-- TAB 3: SCOREBOARD -->
+    <section id="panel-scoreboard" class="panel">
       <div class="card">
-        <div class="card-title"><span>Multiplayer &amp; Session Scoreboard</span><button type="button" class="secondary" onclick="window.submitScoreNow()">Sync Score</button></div>
-        <div id="scoreboard-list">
-          <div class="sub">No scores recorded yet. Complete a round to populate the scoreboard.</div>
+        <div class="card-head">
+          <span>Scoreboard &amp; Match Results</span>
+          <button type="button" class="btn" onclick="window.submitCurrentScore()">Submit Score</button>
+        </div>
+        <div id="scoreboard-rows"><div class="muted">No match results recorded yet.</div></div>
+      </div>
+    </section>
+
+    <!-- TAB 4: CONSENT & DATA HANDLING -->
+    <section id="panel-privacy" class="panel">
+      <div class="card">
+        <div class="card-head"><span>Consent, Signals &amp; Data Handling</span></div>
+        <div class="info-box">
+          <strong>Presage SmartSpectra &amp; Data Transparency:</strong><br/>
+          - Built for the Presage SmartSpectra SDK Challenge (Flinch Royale). No medical diagnosis, treatment, or health-condition claims are made.<br/>
+          - In the desktop pipeline, SmartSpectra processes video with telemetry disabled (<code>enableTelemetry = false</code>) and exports derived metrics (breathing, blink, talk) without storing raw video on a server.<br/>
+          - In this web client, multiplayer room codes, player names, round state, and reported scores are sent to the Socket.IO server to coordinate matches; no biometric video frames are uploaded to the server.
         </div>
       </div>
     </section>
   </div>
 
   <script src="./socket.io.min.js"></script>
-  <script src="./web-client.js?v=20261122c"></script>
+  <script src="./web-client.js?v=20261122d"></script>
 </body>
 </html>

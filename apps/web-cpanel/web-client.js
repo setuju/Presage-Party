@@ -4,391 +4,386 @@
     "https://presage-party.onrender.com"
   ];
 
-  let socket = null;
-  let serverIdx = 0;
-  let cameraStream = null;
-  let cameraActive = false;
-
-  let myName = "Jack";
-  let myRole = "solo"; // "host" | "guest" | "solo"
-  let currentRoom = "";
-  let roomPlayers = [];
-  let activeRooms = [];
-  let scoreboard = [];
-
-  let selectedMode = "signal-focus";
-  let roundActive = false;
-  let roundDurationSec = 30;
-  let roundEndEpochMs = 0;
-  let composure = 100;
-  let score = 0;
-  let signalHits = 0;
-  let rafHandle = null;
-  let roomPollHandle = null;
-  let lastFrameData = null;
-
-  const serverStatusEl = document.getElementById("server-status-line");
-  const camPillEl = document.getElementById("cam-pill");
-  const hostPillEl = document.getElementById("host-pill");
-  const hostBadgeSmallEl = document.getElementById("host-badge-small");
-  const lobbyFeedbackEl = document.getElementById("lobby-feedback");
-  const activeRoomsListEl = document.getElementById("active-rooms-list");
-  const roomCountLabelEl = document.getElementById("room-count-label");
-  const roomPlayersListEl = document.getElementById("room-players-list");
-  const btnHostStartEl = document.getElementById("btn-host-start");
-  const btnArenaStartEl = document.getElementById("btn-arena-start");
-  const camVideoEl = document.getElementById("camera-video");
-
-  const sigPulseEl = document.getElementById("sig-pulse");
-  const sigBreathEl = document.getElementById("sig-breath");
-  const sigHrvEl = document.getElementById("sig-hrv");
-  const sigSourceEl = document.getElementById("sig-source");
-
-  const hudTimeEl = document.getElementById("hud-time");
-  const hudComposureEl = document.getElementById("hud-composure");
-  const hudScoreEl = document.getElementById("hud-score");
-  const hudSignalsEl = document.getElementById("hud-signals");
-  const arenaModeTitleEl = document.getElementById("arena-mode-title");
-  const arenaPromptEl = document.getElementById("arena-prompt");
-  const arenaEl = document.getElementById("game-arena");
-  const orbEl = document.getElementById("focus-orb");
-  const scoreboardListEl = document.getElementById("scoreboard-list");
-
-  window.switchTab = function (tabName) {
-    document.querySelectorAll(".tab-btn").forEach(btn => {
-      btn.classList.toggle("active", btn.getAttribute("data-tab") === tabName);
-    });
-    document.querySelectorAll(".tab-panel").forEach(panel => {
-      panel.classList.remove("active");
-    });
-    const target = document.getElementById("tab-" + tabName);
-    if (target) target.classList.add("active");
+  const MODE_META = {
+    1: { name: "Chill Mode", hint: "Steady composure. No distractions." },
+    2: { name: "Seriously?", hint: "Audio & text distractions active." },
+    3: { name: "Why So Serious?", hint: "Intense distraction focus. Stay composed." },
+    4: { name: "Don't Scream", hint: "Scare cues active. Post-scare flinches cost -15." }
   };
 
-  function canStart() {
-    if (!currentRoom) return true;
-    return myRole === "host";
+  let socket = null;
+  let serverIndex = 0;
+  let pollTimer = null;
+
+  let playerName = "Jack";
+  let role = "solo"; // "host" | "guest" | "solo"
+  let roomCode = "";
+  let players = [];
+  let rooms = [];
+  let scores = [];
+
+  let currentLevel = 1;
+  let durationSec = 30;
+  let roundRunning = false;
+  let roundStartMs = 0;
+  let roundEndMs = 0;
+  let composure = 100;
+  let blinks = 0;
+  let talks = 0;
+  let rateSpikes = 0;
+  let lastTriggerSlot = -1;
+  let postScareUntilMs = 0;
+  let rafId = null;
+
+  const connStatusEl = document.getElementById("conn-status");
+  const pillModeEl = document.getElementById("pill-mode");
+  const pillRoleEl = document.getElementById("pill-role");
+  const hostBadgeEl = document.getElementById("host-status-badge");
+  const lobbyMsgEl = document.getElementById("lobby-msg");
+  const roomCountEl = document.getElementById("room-count");
+  const roomListEl = document.getElementById("room-list");
+  const activeRoomCodeEl = document.getElementById("active-room-code");
+  const playerListEl = document.getElementById("player-list");
+  const btnStartMpEl = document.getElementById("btn-start-mp");
+
+  const arenaTitleEl = document.getElementById("arena-title");
+  const arenaSubEl = document.getElementById("arena-sub");
+  const composureBarEl = document.getElementById("composure-bar");
+  const composureTextEl = document.getElementById("composure-text");
+  const penaltyCountersEl = document.getElementById("penalty-counters");
+  const hudTimeEl = document.getElementById("hud-time");
+  const hudScoreEl = document.getElementById("hud-score");
+  const hudBlinksEl = document.getElementById("hud-blinks");
+  const hudTalksEl = document.getElementById("hud-talks");
+  const stageTimerEl = document.getElementById("stage-timer");
+  const stageStatusEl = document.getElementById("stage-status");
+  const alertBadgeEl = document.getElementById("alert-badge");
+  const jumpscareLayerEl = document.getElementById("jumpscare-layer");
+  const scoreboardRowsEl = document.getElementById("scoreboard-rows");
+
+  window.setTab = function (tabId) {
+    document.querySelectorAll(".tab").forEach(btn => {
+      btn.classList.toggle("active", btn.getAttribute("data-tab") === tabId);
+    });
+    document.querySelectorAll(".panel").forEach(panel => {
+      panel.classList.remove("active");
+    });
+    const el = document.getElementById("panel-" + tabId);
+    if (el) el.classList.add("active");
+  };
+
+  function showAlert(msg) {
+    if (!alertBadgeEl) return;
+    alertBadgeEl.textContent = msg;
+    alertBadgeEl.classList.add("show");
+    setTimeout(() => alertBadgeEl.classList.remove("show"), 900);
   }
 
-  function refreshRoleUi() {
-    const allowed = canStart();
-    if (btnHostStartEl) btnHostStartEl.disabled = !allowed;
-    if (btnArenaStartEl) btnArenaStartEl.disabled = !allowed;
+  function updateRoleUi() {
+    const isHost = role === "host";
+    if (btnStartMpEl) btnStartMpEl.disabled = !(roomCode && isHost);
 
-    if (hostPillEl) {
-      if (myRole === "host") hostPillEl.textContent = "👑 ROOM MASTER";
-      else if (myRole === "guest") hostPillEl.textContent = "🎮 GUEST";
-      else hostPillEl.textContent = "ROLE: SOLO";
+    if (pillRoleEl) {
+      if (isHost) pillRoleEl.textContent = "ROLE: 👑 ROOM MASTER";
+      else if (role === "guest") pillRoleEl.textContent = "ROLE: 🎮 GUEST";
+      else pillRoleEl.textContent = "ROLE: SOLO";
     }
-    if (hostBadgeSmallEl) {
-      if (myRole === "host") hostBadgeSmallEl.textContent = "👑 ROOM MASTER";
-      else if (myRole === "guest") hostBadgeSmallEl.textContent = "🎮 GUEST";
-      else hostBadgeSmallEl.textContent = "HOST READY";
+    if (hostBadgeEl) {
+      if (isHost) hostBadgeEl.textContent = "👑 ROOM MASTER";
+      else if (role === "guest") hostBadgeEl.textContent = "🎮 GUEST";
+      else hostBadgeEl.textContent = "HOST CONTROL";
     }
-  }
-
-  function renderPlayers() {
-    if (!roomPlayersListEl) return;
-    if (!currentRoom) {
-      roomPlayersListEl.innerHTML = '<div class="sub">Create or join a room to view players.</div>';
-      return;
-    }
-    const list = roomPlayers.length > 0
-      ? roomPlayers
-      : [{ name: myName, role: myRole === "host" ? "host" : "guest", id: (socket && socket.id) || "local" }];
-
-    roomPlayersListEl.innerHTML = list.map(p => {
-      const isMaster = p.role === "host" || p.isHost === true;
-      const badge = isMaster
-        ? '<span class="badge-master">👑 ROOM MASTER</span>'
-        : '<span class="badge-guest">🎮 PLAYER</span>';
-      return '<div class="player-row"><strong>' + (p.name || "Player") + '</strong>' + badge + '</div>';
-    }).join("");
   }
 
   function renderRooms() {
-    if (!activeRoomsListEl) return;
-    const list = Array.isArray(activeRooms) ? activeRooms : [];
-    if (roomCountLabelEl) roomCountLabelEl.textContent = list.length + (list.length === 1 ? " room" : " rooms");
+    if (!roomListEl) return;
+    const list = Array.isArray(rooms) ? rooms : [];
+    if (roomCountEl) roomCountEl.textContent = list.length + (list.length === 1 ? " active" : " active");
     if (list.length === 0) {
-      activeRoomsListEl.innerHTML = '<div class="sub">No active rooms right now. Click Create Room to host one.</div>';
+      roomListEl.innerHTML = '<div class="muted">No active rooms available. Create one as Room Master.</div>';
       return;
     }
-    activeRoomsListEl.innerHTML = list.map(r => {
+    roomListEl.innerHTML = list.map(r => {
       const code = r.code || r.roomCode || "";
-      const hostName = r.hostName || "Host";
-      return '<div class="room-row">' +
-        '<div><strong>' + code + '</strong> <span class="sub">by 👑 ' + hostName + '</span></div>' +
-        '<button type="button" class="secondary" onclick="window.quickJoin(\'' + code + '\')">Join</button>' +
+      const hostName = r.host || r.hostName || "Room Master";
+      return '<div class="room-item">' +
+        '<div><strong>' + code + '</strong> <span class="muted">· Host: ' + hostName + '</span></div>' +
+        '<button type="button" class="btn btn-m2" onclick="window.joinWithCode(\'' + code + '\')">Join</button>' +
         '</div>';
+    }).join("");
+  }
+
+  function renderPlayers() {
+    if (!playerListEl) return;
+    if (activeRoomCodeEl) activeRoomCodeEl.textContent = roomCode || "-";
+    if (!roomCode) {
+      playerListEl.innerHTML = '<div class="muted">Not in a multiplayer room.</div>';
+      return;
+    }
+    const list = players.length > 0
+      ? players
+      : [{ name: playerName, role: role === "host" ? "host" : "guest" }];
+    playerListEl.innerHTML = list.map(p => {
+      const badge = p.role === "host"
+        ? '<span class="badge-master">👑 ROOM MASTER</span>'
+        : '<span class="badge-guest">🎮 PLAYER</span>';
+      return '<div class="player-item"><strong>' + (p.name || "Player") + '</strong>' + badge + '</div>';
     }).join("");
   }
 
   function renderScoreboard() {
-    if (!scoreboardListEl) return;
-    if (!Array.isArray(scoreboard) || scoreboard.length === 0) {
-      scoreboardListEl.innerHTML = '<div class="sub">No scores recorded yet.</div>';
+    if (!scoreboardRowsEl) return;
+    if (!Array.isArray(scores) || scores.length === 0) {
+      scoreboardRowsEl.innerHTML = '<div class="muted">No match results recorded yet.</div>';
       return;
     }
-    const sorted = [...scoreboard].sort((a, b) => (b.score || 0) - (a.score || 0));
-    scoreboardListEl.innerHTML = sorted.map((entry, idx) => {
-      const roleBadge = entry.role === "host"
-        ? '<span class="badge-master">👑 MASTER</span>'
+    const sorted = [...scores].sort((a, b) => (b.score || 0) - (a.score || 0));
+    scoreboardRowsEl.innerHTML = sorted.map((s, i) => {
+      const tag = s.role === "host"
+        ? '<span class="badge-master">👑 ROOM MASTER</span>'
         : '<span class="badge-guest">🎮 PLAYER</span>';
-      return '<div class="score-row">' +
-        '<div><strong>#' + (idx + 1) + ' ' + (entry.name || "Player") + '</strong> ' + roleBadge + '</div>' +
-        '<strong>' + (entry.score || 0) + ' pts</strong>' +
+      return '<div class="score-item">' +
+        '<div><strong>#' + (i + 1) + ' ' + s.name + '</strong> ' + tag + ' <span class="muted">(' + s.modeName + ')</span></div>' +
+        '<strong>' + s.score + ' / 1000</strong>' +
         '</div>';
     }).join("");
   }
 
-  function upsertScore(name, pts, role) {
-    const idx = scoreboard.findIndex(s => s.name === name);
-    const item = { name, score: Math.max(0, Math.round(pts)), role: role || myRole };
-    if (idx >= 0) scoreboard[idx] = item;
-    else scoreboard.push(item);
+  function recordScore(name, pts, r) {
+    const modeName = (MODE_META[currentLevel] && MODE_META[currentLevel].name) || "Chill Mode";
+    const clamped = Math.max(0, Math.min(1000, Math.round(pts)));
+    const idx = scores.findIndex(item => item.name === name);
+    const entry = { name, score: clamped, role: r || role, modeName };
+    if (idx >= 0) scores[idx] = entry;
+    else scores.push(entry);
     renderScoreboard();
   }
 
-  function updateHud(remainingMs) {
-    const rem = Math.max(0, remainingMs / 1000);
-    if (hudTimeEl) hudTimeEl.textContent = rem.toFixed(1) + "s";
-    if (hudComposureEl) hudComposureEl.textContent = String(Math.max(0, Math.round(composure)));
-    if (hudScoreEl) hudScoreEl.textContent = String(Math.max(0, Math.round(score)));
-    if (hudSignalsEl) hudSignalsEl.textContent = String(signalHits);
-  }
+  function refreshArenaHud(remainingMs) {
+    const secLeft = Math.max(0, Math.ceil(remainingMs / 1000));
+    const liveScore = composure > 0 ? Math.round(composure * 10) : 0;
 
-  function sampleCameraSignals() {
-    if (!cameraActive || !camVideoEl || camVideoEl.readyState < 2) {
-      if (sigPulseEl) sigPulseEl.textContent = "--";
-      if (sigBreathEl) sigBreathEl.textContent = "--";
-      if (sigHrvEl) sigHrvEl.textContent = "--";
-      if (sigSourceEl) sigSourceEl.textContent = "Camera Req";
-      return 0;
+    if (stageTimerEl) stageTimerEl.textContent = String(secLeft);
+    if (hudTimeEl) hudTimeEl.textContent = secLeft + "s";
+    if (hudScoreEl) hudScoreEl.textContent = String(liveScore);
+    if (hudBlinksEl) hudBlinksEl.textContent = String(blinks);
+    if (hudTalksEl) hudTalksEl.textContent = String(talks);
+    if (penaltyCountersEl) {
+      penaltyCountersEl.textContent = "blinks: " + blinks + " · talks: " + talks + " · rate: " + rateSpikes;
     }
 
-    const canvas = document.createElement("canvas");
-    canvas.width = 48;
-    canvas.height = 36;
-    const ctx = canvas.getContext("2d");
-    ctx.drawImage(camVideoEl, 0, 0, canvas.width, canvas.height);
-    const frame = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
+    const cRounded = Math.max(0, Math.min(100, Math.round(composure)));
+    if (composureBarEl) {
+      composureBarEl.style.width = cRounded + "%";
+      if (cRounded > 60) composureBarEl.style.backgroundColor = "#4ade80";
+      else if (cRounded > 30) composureBarEl.style.backgroundColor = "#fbbf24";
+      else composureBarEl.style.backgroundColor = "#f87171";
+    }
+    if (composureTextEl) composureTextEl.textContent = "COMPOSURE " + cRounded + "%";
+  }
 
-    let diffSum = 0;
-    let lumaSum = 0;
-    const pixels = frame.length / 4;
-    for (let i = 0; i < frame.length; i += 4) {
-      const luma = 0.299 * frame[i] + 0.587 * frame[i + 1] + 0.114 * frame[i + 2];
-      lumaSum += luma;
-      if (lastFrameData) {
-        const prevLuma = 0.299 * lastFrameData[i] + 0.587 * lastFrameData[i + 1] + 0.114 * lastFrameData[i + 2];
-        diffSum += Math.abs(luma - prevLuma);
+  function triggerModeCue(slot) {
+    if (currentLevel === 2) {
+      const cues = ["Do not flinch.", "Stay steady!", "Are you calm?", "Keep composure!"];
+      if (stageStatusEl) stageStatusEl.textContent = cues[slot % cues.length];
+      showAlert("DISTRACTION");
+    } else if (currentLevel === 3) {
+      if (stageStatusEl) stageStatusEl.textContent = "Why So Serious? Hold your focus!";
+      showAlert("FOCUS TEST");
+    } else if (currentLevel === 4) {
+      postScareUntilMs = Date.now() + 1800;
+      if (jumpscareLayerEl) {
+        jumpscareLayerEl.classList.add("active");
+        setTimeout(() => jumpscareLayerEl.classList.remove("active"), 550);
+      }
+      if (stageStatusEl) stageStatusEl.textContent = "JUMPSCARE! Do not flinch!";
+      showAlert("SCARE CUE!");
+    }
+  }
+
+  function stepRound() {
+    if (!roundRunning) return;
+    const now = Date.now();
+    const elapsed = now - roundStartMs;
+    const remaining = roundEndMs - now;
+
+    if (currentLevel >= 2) {
+      const slot = Math.floor(elapsed / 5000);
+      if (slot > lastTriggerSlot && slot > 0) {
+        lastTriggerSlot = slot;
+        triggerModeCue(slot);
       }
     }
-    lastFrameData = new Uint8ClampedArray(frame);
 
-    const avgLuma = lumaSum / pixels;
-    const motion = diffSum / pixels;
-    const pulseEst = Math.round(64 + Math.min(45, motion * 2.4) + Math.sin(Date.now() / 650) * 3);
-    const breathEst = Math.round(13 + Math.min(10, motion * 0.6));
-    const hrvEst = Math.max(22, Math.round(68 - motion * 1.5));
+    refreshArenaHud(remaining);
 
-    if (sigPulseEl) sigPulseEl.textContent = pulseEst + " bpm";
-    if (sigBreathEl) sigBreathEl.textContent = breathEst + "/m";
-    if (sigHrvEl) sigHrvEl.textContent = hrvEst + " ms";
-    if (sigSourceEl) sigSourceEl.textContent = "Live Cam";
-    return motion;
-  }
-
-  function moveOrb() {
-    if (!arenaEl || !orbEl) return;
-    const maxX = Math.max(40, arenaEl.clientWidth - 84);
-    const maxY = Math.max(40, arenaEl.clientHeight - 84);
-    orbEl.style.left = (12 + Math.random() * (maxX - 12)) + "px";
-    orbEl.style.top = (12 + Math.random() * (maxY - 12)) + "px";
-    orbEl.style.transform = "none";
-  }
-
-  window.tapTarget = function () {
-    if (!roundActive) {
-      if (arenaPromptEl) arenaPromptEl.textContent = "Start the round first to sync signals.";
+    if (composure <= 0 || remaining <= 0) {
+      window.endRound(true);
       return;
     }
-    if (!cameraActive && selectedMode !== "flinch-challenge") {
-      if (arenaPromptEl) arenaPromptEl.textContent = "Enable Camera in Tab 2 for live camera signal response.";
-      return;
-    }
-    signalHits += 1;
-    score += 20;
-    composure = Math.min(100, composure + 2);
-    moveOrb();
-    updateHud(Math.max(0, roundEndEpochMs - Date.now()));
-  };
-
-  function loopRound() {
-    if (!roundActive) return;
-    const now = Date.now();
-    const remaining = roundEndEpochMs - now;
-    const motion = sampleCameraSignals();
-
-    if (cameraActive && motion > 14) {
-      composure = Math.max(0, composure - 0.15);
-    }
-
-    updateHud(remaining);
-
-    if (remaining <= 0 || composure <= 0) {
-      window.finishRound(true);
-      return;
-    }
-    rafHandle = requestAnimationFrame(loopRound);
+    rafId = requestAnimationFrame(stepRound);
   }
 
-  function startRoundNow(mode, durationSec) {
-    selectedMode = mode || (document.getElementById("game-mode-select") && document.getElementById("game-mode-select").value) || "signal-focus";
-    roundDurationSec = Number(durationSec || (document.getElementById("game-duration-select") && document.getElementById("game-duration-select").value) || 30) || 30;
+  function startRound(level, sec) {
+    currentLevel = Number(level) || 1;
+    durationSec = Number(sec) || 30;
+    const meta = MODE_META[currentLevel] || MODE_META[1];
 
-    if (rafHandle) cancelAnimationFrame(rafHandle);
-    roundActive = true;
+    if (pillModeEl) pillModeEl.textContent = "MODE: " + meta.name.toUpperCase();
+    if (arenaTitleEl) arenaTitleEl.textContent = meta.name;
+    if (arenaSubEl) arenaSubEl.textContent = meta.hint;
+    if (stageStatusEl) stageStatusEl.textContent = meta.hint;
+
+    if (rafId) cancelAnimationFrame(rafId);
+    roundRunning = true;
     composure = 100;
-    score = 0;
-    signalHits = 0;
-    roundEndEpochMs = Date.now() + roundDurationSec * 1000;
+    blinks = 0;
+    talks = 0;
+    rateSpikes = 0;
+    lastTriggerSlot = 0;
+    postScareUntilMs = 0;
+    roundStartMs = Date.now();
+    roundEndMs = roundStartMs + durationSec * 1000;
 
-    if (arenaModeTitleEl) arenaModeTitleEl.textContent = "Mode: " + selectedMode;
-    if (arenaPromptEl) {
-      arenaPromptEl.textContent = cameraActive
-        ? "Live camera active — sync PULSE orb steadily!"
-        : "Camera off — enable Camera in Tab 2 for SmartSpectra signals.";
-    }
-    moveOrb();
-    window.switchTab("arena");
-    rafHandle = requestAnimationFrame(loopRound);
+    refreshArenaHud(durationSec * 1000);
+    window.setTab("arena");
+    rafId = requestAnimationFrame(stepRound);
   }
 
-  window.hostStartGame = function () {
-    if (!canStart()) {
-      if (lobbyFeedbackEl) lobbyFeedbackEl.textContent = "Only the 👑 ROOM MASTER can start this room's game.";
-      return;
-    }
-    const mode = (document.getElementById("game-mode-select") && document.getElementById("game-mode-select").value) || "signal-focus";
-    const dur = Number((document.getElementById("game-duration-select") && document.getElementById("game-duration-select").value) || 30) || 30;
-    if (currentRoom && socket && socket.connected) {
-      socket.emit("start_game", { code: currentRoom, roomCode: currentRoom, mode, duration: dur });
-    }
-    startRoundNow(mode, dur);
+  window.selectAndLaunchMode = function (level) {
+    const durEl = document.getElementById("select-duration");
+    const dur = durEl ? Number(durEl.value) : 30;
+    startRound(level, dur);
   };
 
-  window.submitScoreNow = function () {
-    const finalPts = Math.round(score + composure);
-    upsertScore(myName, finalPts, myRole);
+  window.startSoloNow = function () {
+    window.selectAndLaunchMode(currentLevel);
+  };
+
+  window.simBlink = function () {
+    if (!roundRunning) return;
+    const pen = Date.now() < postScareUntilMs ? 15 : 4;
+    blinks += 1;
+    composure = Math.max(0, composure - pen);
+    showAlert(pen === 15 ? "POST-SCARE -" + pen : "BLINK -" + pen);
+    refreshArenaHud(Math.max(0, roundEndMs - Date.now()));
+    if (composure <= 0) window.endRound(true);
+  };
+
+  window.simTalk = function () {
+    if (!roundRunning) return;
+    talks += 1;
+    composure = Math.max(0, composure - 8);
+    showAlert("TALK -8");
+    refreshArenaHud(Math.max(0, roundEndMs - Date.now()));
+    if (composure <= 0) window.endRound(true);
+  };
+
+  window.submitCurrentScore = function () {
+    const finalPts = composure > 0 ? Math.round(composure * 10) : 0;
+    recordScore(playerName, finalPts, role);
     if (socket && socket.connected) {
       socket.emit("report_score", {
-        roomCode: currentRoom || undefined,
         score: finalPts,
-        blinks: 0,
-        talks: 0,
-        rateSpikes: 0,
+        blinks,
+        talks,
+        rateSpikes,
         survived: composure > 0
       });
     }
   };
 
-  window.finishRound = function (shouldSubmit) {
-    roundActive = false;
-    if (rafHandle) { cancelAnimationFrame(rafHandle); rafHandle = null; }
-    updateHud(0);
-    if (arenaPromptEl) arenaPromptEl.textContent = "Round finished. Check Scoreboard tab.";
-    if (shouldSubmit) window.submitScoreNow();
-    window.switchTab("scoreboard");
-  };
-
-  window.enableCamera = async function () {
-    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-      if (camPillEl) camPillEl.textContent = "CAM: UNSUPPORTED";
-      return;
+  window.endRound = function (submit) {
+    roundRunning = false;
+    if (rafId) { cancelAnimationFrame(rafId); rafId = null; }
+    if (jumpscareLayerEl) jumpscareLayerEl.classList.remove("active");
+    refreshArenaHud(0);
+    if (stageStatusEl) {
+      stageStatusEl.textContent = composure > 0
+        ? "Round complete! Survived with " + Math.round(composure) + "% composure."
+        : "Eliminated — composure reached 0%.";
     }
-    try {
-      if (cameraStream) cameraStream.getTracks().forEach(t => t.stop());
-      cameraStream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: { ideal: "user" } },
-        audio: false
-      });
-      if (camVideoEl) camVideoEl.srcObject = cameraStream;
-      cameraActive = true;
-      lastFrameData = null;
-      if (camPillEl) camPillEl.textContent = "CAM: LIVE";
-      setInterval(() => {
-        if (cameraActive && !roundActive) sampleCameraSignals();
-      }, 600);
-    } catch (err) {
-      cameraActive = false;
-      if (camPillEl) camPillEl.textContent = "CAM: BLOCKED";
-      if (lobbyFeedbackEl) {
-        lobbyFeedbackEl.textContent = "Camera access denied (" + (err && err.name ? err.name : "Error") + "). Allow camera permission in browser & OS settings.";
-      }
-    }
-  };
-
-  window.disableCamera = function () {
-    cameraActive = false;
-    if (cameraStream) {
-      cameraStream.getTracks().forEach(t => t.stop());
-      cameraStream = null;
-    }
-    if (camVideoEl) camVideoEl.srcObject = null;
-    if (camPillEl) camPillEl.textContent = "CAM: OFF";
-    sampleCameraSignals();
+    if (submit) window.submitCurrentScore();
+    window.setTab("scoreboard");
   };
 
   window.refreshRooms = function () {
     if (socket && socket.connected) socket.emit("get_rooms");
   };
 
-  window.createGameRoom = function () {
-    const nameInput = document.getElementById("player-name");
-    myName = (nameInput && nameInput.value.trim()) || "Jack";
+  window.createRoom = function () {
+    const nameEl = document.getElementById("input-name");
+    const passEl = document.getElementById("input-pass");
+    playerName = (nameEl && nameEl.value.trim()) || "Jack";
     if (!socket || !socket.connected) {
-      if (lobbyFeedbackEl) lobbyFeedbackEl.textContent = "Server connecting... please try again in a moment.";
+      if (lobbyMsgEl) lobbyMsgEl.textContent = "Connecting to server... try again in a second.";
       return;
     }
-    socket.emit("create_room", { hostName: myName, name: myName });
+    socket.emit("create_room", {
+      name: playerName,
+      hostName: playerName,
+      password: passEl ? passEl.value.trim() : ""
+    });
   };
 
-  window.quickJoin = function (code) {
-    const codeInput = document.getElementById("room-code-input");
-    if (codeInput) codeInput.value = code;
-    window.joinGameRoom();
+  window.joinWithCode = function (code) {
+    const codeEl = document.getElementById("input-code");
+    if (codeEl) codeEl.value = code;
+    window.joinRoom();
   };
 
-  window.joinGameRoom = function () {
-    const nameInput = document.getElementById("player-name");
-    const codeInput = document.getElementById("room-code-input");
-    myName = (nameInput && nameInput.value.trim()) || "Jack";
-    const code = (codeInput && codeInput.value.trim().toUpperCase()) || "";
+  window.joinRoom = function () {
+    const nameEl = document.getElementById("input-name");
+    const codeEl = document.getElementById("input-code");
+    const passEl = document.getElementById("input-pass");
+    playerName = (nameEl && nameEl.value.trim()) || "Jack";
+    const code = (codeEl && codeEl.value.trim().toUpperCase()) || "";
     if (!code) {
-      if (lobbyFeedbackEl) lobbyFeedbackEl.textContent = "Enter a room code or click Join on an active room.";
+      if (lobbyMsgEl) lobbyMsgEl.textContent = "Enter a room code or pick a room from Active Rooms.";
       return;
     }
     if (!socket || !socket.connected) {
-      if (lobbyFeedbackEl) lobbyFeedbackEl.textContent = "Server connecting... please try again.";
+      if (lobbyMsgEl) lobbyMsgEl.textContent = "Server not connected yet.";
       return;
     }
-    currentRoom = code;
-    socket.emit("join_room", { code, roomCode: code, name: myName });
+    socket.emit("join_room", {
+      code,
+      name: playerName,
+      password: passEl ? passEl.value.trim() : ""
+    }, (res) => {
+      if (res && res.success === false && lobbyMsgEl) {
+        lobbyMsgEl.textContent = "Join failed: " + (res.error || "Unable to join room");
+      }
+    });
   };
 
-  function connectServer() {
+  window.startMultiplayerRound = function () {
+    if (!roomCode || role !== "host") {
+      if (lobbyMsgEl) lobbyMsgEl.textContent = "Only the 👑 ROOM MASTER can start the multiplayer round.";
+      return;
+    }
+    const durEl = document.getElementById("select-duration");
+    const dur = durEl ? Number(durEl.value) : 30;
+    if (socket && socket.connected) {
+      socket.emit("start_game", { level: currentLevel, duration: dur }, (res) => {
+        if (res && res.success === false && lobbyMsgEl) {
+          lobbyMsgEl.textContent = res.error || "Wait for a second player to join before starting.";
+        }
+      });
+    }
+  };
+
+  function connectSocket() {
     if (typeof window.io !== "function") return;
-    const url = SERVER_URLS[serverIdx];
-    if (serverStatusEl) serverStatusEl.textContent = "Connecting to " + url + "...";
+    const target = SERVER_URLS[serverIndex];
+    if (connStatusEl) connStatusEl.textContent = "Connecting to " + target + "...";
 
     if (socket) {
       socket.removeAllListeners();
       socket.disconnect();
     }
 
-    socket = window.io(url, {
+    socket = window.io(target, {
       transports: ["websocket", "polling"],
       timeout: 4500,
       reconnection: true,
@@ -396,84 +391,94 @@
     });
 
     socket.on("connect", () => {
-      if (serverStatusEl) {
-        serverStatusEl.textContent = "Connected: " + url + (serverIdx === 0 ? " (Primary)" : " (Fallback Render)");
+      if (connStatusEl) {
+        connStatusEl.textContent = "Connected: " + target + (serverIndex === 0 ? " (Primary)" : " (Fallback)");
       }
       socket.emit("get_rooms");
-      if (roomPollHandle) clearInterval(roomPollHandle);
-      roomPollHandle = setInterval(() => {
+      if (pollTimer) clearInterval(pollTimer);
+      pollTimer = setInterval(() => {
         if (socket && socket.connected) socket.emit("get_rooms");
-      }, 4000);
+      }, 3500);
     });
 
     socket.on("connect_error", () => {
-      if (serverIdx + 1 < SERVER_URLS.length) {
-        serverIdx += 1;
-        connectServer();
-      } else if (serverStatusEl) {
-        serverStatusEl.textContent = "Server connection unavailable right now.";
+      if (serverIndex + 1 < SERVER_URLS.length) {
+        serverIndex += 1;
+        connectSocket();
+      } else if (connStatusEl) {
+        connStatusEl.textContent = "Server unreachable right now.";
       }
     });
 
     socket.on("rooms_list", (list) => {
-      activeRooms = Array.isArray(list) ? list : [];
+      rooms = Array.isArray(list) ? list : [];
       renderRooms();
     });
 
     socket.on("room_created", (data) => {
-      myRole = "host";
-      currentRoom = (data && (data.roomCode || data.code)) || "";
-      const codeInput = document.getElementById("room-code-input");
-      if (codeInput && currentRoom) codeInput.value = currentRoom;
-      roomPlayers = [{ id: socket.id, name: myName, role: "host" }];
-      refreshRoleUi();
+      role = "host";
+      roomCode = (data && (data.roomCode || data.code)) || "";
+      const codeEl = document.getElementById("input-code");
+      if (codeEl && roomCode) codeEl.value = roomCode;
+      players = [{ name: (data && data.hostName) || playerName, role: "host" }];
+      updateRoleUi();
       renderPlayers();
-      upsertScore(myName, 0, "host");
-      if (lobbyFeedbackEl) lobbyFeedbackEl.textContent = "👑 Room " + currentRoom + " created. Share code " + currentRoom + " to join.";
+      recordScore(playerName, 0, "host");
+      if (lobbyMsgEl) {
+        lobbyMsgEl.textContent = "👑 Room " + roomCode + " created. You are Room Master.";
+      }
       socket.emit("get_rooms");
     });
 
-    socket.on("player_joined", (p) => {
-      if (p && p.name) {
-        const exists = roomPlayers.some(x => x.name === p.name);
-        if (!exists) roomPlayers.push({ id: p.id || p.name, name: p.name, role: "guest" });
-        renderPlayers();
+    socket.on("room_joined", (data) => {
+      role = "guest";
+      roomCode = (data && data.code) || roomCode;
+      players = [];
+      if (data && data.hostName) players.push({ name: data.hostName, role: "host" });
+      players.push({ name: playerName, role: "guest" });
+      updateRoleUi();
+      renderPlayers();
+      recordScore(playerName, 0, "guest");
+      if (lobbyMsgEl) {
+        lobbyMsgEl.textContent = "🎮 Joined room " + roomCode + " (Host: " + ((data && data.hostName) || "Room Master") + ").";
       }
     });
 
-    socket.on("room_joined", (data) => {
-      myRole = "guest";
-      currentRoom = (data && (data.code || data.roomCode)) || currentRoom;
-      roomPlayers = [];
-      if (data && data.hostName) roomPlayers.push({ id: data.host || "host", name: data.hostName, role: "host" });
-      roomPlayers.push({ id: socket.id, name: myName, role: "guest" });
-      refreshRoleUi();
-      renderPlayers();
-      upsertScore(myName, 0, "guest");
-      if (lobbyFeedbackEl) lobbyFeedbackEl.textContent = "🎮 Joined room " + currentRoom + " (Host: " + (data && data.hostName ? data.hostName : "Master") + ").";
+    socket.on("player_joined", (p) => {
+      if (p && p.name && !players.some(x => x.name === p.name)) {
+        players.push({ name: p.name, role: "guest" });
+        renderPlayers();
+      }
+      if (lobbyMsgEl) lobbyMsgEl.textContent = ((p && p.name) || "Player") + " joined room " + roomCode + ".";
     });
 
     socket.on("game_start", (payload) => {
-      startRoundNow(payload && payload.mode, payload && payload.duration);
+      const startAt = (payload && payload.startAt) || Date.now();
+      const delay = Math.max(0, startAt - Date.now());
+      const lvl = (payload && payload.level) || currentLevel;
+      const dur = (payload && payload.duration) || durationSec;
+      if (stageStatusEl) stageStatusEl.textContent = "Starting round...";
+      window.setTab("arena");
+      setTimeout(() => startRound(lvl, dur), delay);
     });
 
     socket.on("game_result", (payload) => {
-      if (payload && payload.host && payload.hostName) {
-        upsertScore(payload.hostName, payload.host.score || 0, "host");
+      if (payload && payload.hostName && payload.host) {
+        recordScore(payload.hostName, payload.host.score || 0, "host");
       }
-      if (payload && payload.guest && payload.guestName) {
-        upsertScore(payload.guestName, payload.guest.score || 0, "guest");
+      if (payload && payload.guestName && payload.guest) {
+        recordScore(payload.guestName, payload.guest.score || 0, "guest");
       }
-      window.switchTab("scoreboard");
+      window.setTab("scoreboard");
     });
   }
 
   window.addEventListener("DOMContentLoaded", () => {
-    refreshRoleUi();
+    updateRoleUi();
     renderRooms();
     renderPlayers();
     renderScoreboard();
-    updateHud(30000);
-    connectServer();
+    refreshArenaHud(30000);
+    connectSocket();
   });
 })();

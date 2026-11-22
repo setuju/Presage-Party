@@ -34,7 +34,7 @@
   const MODE_META = {
     1: { name: "Chill Mode", hint: "Steady composure. Baseline round." },
     2: { name: "Seriously?", hint: "Audio & text distractions active." },
-    3: { name: "Why So Serious?", hint: "Video challenge active. Keep composure!" },
+    3: { name: "Why So Serious?", hint: "Vertical video challenge active. Keep composure!" },
     4: { name: "Don't Scream", hint: "Scare cues active. Post-scare flinches cost -15." }
   };
 
@@ -76,8 +76,30 @@
   let lastTriggerSlot = -1;
   let postScareUntilMs = 0;
   let rafId = null;
+
+  // Real-time Camera & Optical Motion/Flinch Tracker
   let camStream = null;
+  let motionCheckTimer = null;
+  let prevFrameData = null;
+  let lastFlinchTime = 0;
+  let sustainedMotionMs = 0;
+  let lastMotionCheckTime = 0;
+  const FLINCH_THRESHOLD = 9.5;
+  const FLINCH_COOLDOWN_MS = 1400;
+
+  const motionCanvas = document.createElement("canvas");
+  motionCanvas.width = 64;
+  motionCanvas.height = 48;
+  const motionCtx = motionCanvas.getContext("2d", { willReadFrequently: true });
+
+  // Replay timeline
   let replayData = null;
+  let lastReplayBlinkState = false;
+  let lastReplayBlinkTime = -Infinity;
+  let replayTalkAccumMs = 0;
+  let lastReplayTalkTime = -Infinity;
+  let lastRatePenaltyTime = -Infinity;
+
   let videoErrorCount = 0;
   let audioCtx = null;
 
@@ -110,8 +132,18 @@
   const hudBlinksEl = document.getElementById("hud-blinks");
   const hudTalksEl = document.getElementById("hud-talks");
   const arenaStageEl = document.getElementById("arena-stage");
-  const videoStageBoxEl = document.getElementById("video-stage-box");
-  const arenaVideoEl = document.getElementById("arena-video");
+
+  // Stage boxes
+  const reelStageBoxEl = document.getElementById("reel-stage-box");
+  const reelVideoEl = document.getElementById("reel-video");
+  const cameraStageBoxEl = document.getElementById("camera-stage-box");
+  const cameraVideoEl = document.getElementById("camera-video");
+  const camBadgeTextEl = document.getElementById("cam-badge-text");
+  const camDotEl = document.getElementById("cam-dot");
+  const motionTextEl = document.getElementById("motion-text");
+  const signalTextEl = document.getElementById("signal-text");
+  const btnCamEl = document.getElementById("btn-cam");
+
   const stageTimerEl = document.getElementById("stage-timer");
   const stageStatusEl = document.getElementById("stage-status");
   const videoCaptionEl = document.getElementById("video-caption");
@@ -230,6 +262,10 @@
     });
     const el = document.getElementById("panel-" + tabId);
     if (el) el.classList.add("active");
+
+    if (tabId === "arena") {
+      window.ensureCameraActive();
+    }
   };
 
   function showAlert(msg) {
@@ -239,6 +275,140 @@
     setTimeout(() => alertBadgeEl.classList.remove("show"), 950);
   }
 
+  // --- CAMERA & REAL-TIME MOTION SENSING ENGINE ---
+
+  window.requestCameraPermission = async function () {
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      if (camBadgeTextEl) camBadgeTextEl.textContent = "NO CAMERA (REPLAY ACTIVE)";
+      if (signalTextEl) signalTextEl.textContent = "Signals: SmartSpectra Timeline";
+      if (btnCamEl) btnCamEl.textContent = "📷 Camera: OFF";
+      return false;
+    }
+    try {
+      if (camStream) {
+        camStream.getTracks().forEach(t => t.stop());
+        camStream = null;
+      }
+      camStream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: "user", width: { ideal: 640 }, height: { ideal: 480 } },
+        audio: false
+      });
+      if (cameraVideoEl) {
+        cameraVideoEl.srcObject = camStream;
+        cameraVideoEl.muted = true;
+        await cameraVideoEl.play().catch(() => {});
+      }
+      if (camBadgeTextEl) camBadgeTextEl.textContent = "CAMERA LIVE · FLINCH TRACKER";
+      if (camDotEl) { camDotEl.style.backgroundColor = "#4ade80"; camDotEl.style.display = "inline-block"; }
+      if (signalTextEl) signalTextEl.textContent = "Signals: Live Camera (Tracking)";
+      if (btnCamEl) btnCamEl.textContent = "📷 Camera: ON";
+      if (stageStatusEl && !roundRunning) {
+        stageStatusEl.textContent = "Camera active — stay steady and don't flinch!";
+      }
+
+      if (motionCheckTimer) clearInterval(motionCheckTimer);
+      motionCheckTimer = setInterval(analyzeCameraFrame, 100);
+      return true;
+    } catch (err) {
+      console.warn("[camera] Permission not granted or device unavailable:", err);
+      if (camBadgeTextEl) camBadgeTextEl.textContent = "CAMERA OFF (REPLAY ACTIVE)";
+      if (camDotEl) camDotEl.style.backgroundColor = "#fbbf24";
+      if (signalTextEl) signalTextEl.textContent = "Signals: SmartSpectra Replay";
+      if (btnCamEl) btnCamEl.textContent = "📷 Camera: OFF";
+      if (stageStatusEl && !roundRunning) {
+        stageStatusEl.textContent = "Camera unavailable. SmartSpectra Replay metrics active.";
+      }
+      return false;
+    }
+  };
+
+  window.ensureCameraActive = async function () {
+    if (camStream && camStream.active) return true;
+    return await window.requestCameraPermission();
+  };
+
+  window.toggleCameraPreview = async function () {
+    if (camStream) {
+      camStream.getTracks().forEach(t => t.stop());
+      camStream = null;
+      if (cameraVideoEl) cameraVideoEl.srcObject = null;
+      if (motionCheckTimer) { clearInterval(motionCheckTimer); motionCheckTimer = null; }
+      if (camBadgeTextEl) camBadgeTextEl.textContent = "CAMERA OFF · REPLAY READY";
+      if (camDotEl) camDotEl.style.backgroundColor = "#fbbf24";
+      if (signalTextEl) signalTextEl.textContent = "Signals: SmartSpectra Replay";
+      if (btnCamEl) btnCamEl.textContent = "📷 Camera: OFF";
+      if (stageStatusEl) stageStatusEl.textContent = "Camera paused. SmartSpectra Replay metrics active.";
+      return;
+    }
+    await window.requestCameraPermission();
+  };
+
+  function analyzeCameraFrame() {
+    if (!camStream || !cameraVideoEl || cameraVideoEl.readyState < 2) return;
+    try {
+      motionCtx.drawImage(cameraVideoEl, 0, 0, 64, 48);
+      const img = motionCtx.getImageData(0, 0, 64, 48);
+      const data = img.data;
+      const now = Date.now();
+      const dt = lastMotionCheckTime ? now - lastMotionCheckTime : 100;
+      lastMotionCheckTime = now;
+
+      if (prevFrameData) {
+        let diffSum = 0;
+        let sampledCount = 0;
+        // Sample face center region (y: 8..40, x: 14..50)
+        for (let y = 8; y < 40; y++) {
+          for (let x = 14; x < 50; x++) {
+            const idx = (y * 64 + x) * 4;
+            const lum = (data[idx] * 299 + data[idx + 1] * 587 + data[idx + 2] * 114) / 1000;
+            const prevLum = (prevFrameData[idx] * 299 + prevFrameData[idx + 1] * 587 + prevFrameData[idx + 2] * 114) / 1000;
+            diffSum += Math.abs(lum - prevLum);
+            sampledCount++;
+          }
+        }
+        const energy = diffSum / (sampledCount || 1);
+
+        if (motionTextEl) {
+          const isFlinch = energy > FLINCH_THRESHOLD;
+          motionTextEl.textContent = "Motion: " + energy.toFixed(1) + (isFlinch ? " (FLINCH!)" : " (Calm)");
+          motionTextEl.style.color = isFlinch ? "#f87171" : "#4ade80";
+        }
+
+        // Apply real-time camera scoring penalty during round
+        if (roundRunning) {
+          if (energy > FLINCH_THRESHOLD && (now - lastFlinchTime) > FLINCH_COOLDOWN_MS) {
+            lastFlinchTime = now;
+            const isScare = now < postScareUntilMs;
+            const pen = isScare ? 15 : 4;
+            blinks += 1;
+            composure = Math.max(0, composure - pen);
+            showAlert(isScare ? "📷 POST-SCARE FLINCH -" + pen : "📷 FLINCH DETECTED -" + pen);
+            refreshArenaHud(Math.max(0, roundEndMs - Date.now()));
+            if (composure <= 0) window.endRound(true);
+          }
+
+          // Sustained high motion = talking / laughing
+          if (energy > 5.5) {
+            sustainedMotionMs += dt;
+            if (sustainedMotionMs > 1700) {
+              sustainedMotionMs = 0;
+              talks += 1;
+              composure = Math.max(0, composure - 8);
+              showAlert("📷 TALK / MOVEMENT -8");
+              refreshArenaHud(Math.max(0, roundEndMs - Date.now()));
+              if (composure <= 0) window.endRound(true);
+            }
+          } else {
+            sustainedMotionMs = Math.max(0, sustainedMotionMs - dt * 0.5);
+          }
+        }
+      }
+      prevFrameData = data;
+    } catch (e) {}
+  }
+
+  // --- ASSET PACK DOWNLOAD & LEVEL 3 REELS ---
+
   function updateAssetBannerUi(pct, statusText) {
     if (assetProgressBarEl && typeof pct === "number") {
       assetProgressBarEl.style.width = Math.max(0, Math.min(100, pct)) + "%";
@@ -247,7 +417,7 @@
       if (assetBannerEl) assetBannerEl.classList.add("ready");
       if (assetBannerTitleEl) assetBannerTitleEl.textContent = "Video Pack Ready (8/8 Clips Cached)";
       if (assetBannerDescEl) {
-        assetBannerDescEl.textContent = statusText || "All distraction video clips for Level 3 ('Why So Serious?') are ready to play.";
+        assetBannerDescEl.textContent = statusText || "All distraction YouTube Reel clips for Level 3 ('Why So Serious?') are ready in 9:16 vertical format.";
       }
       if (btnDownloadAssetsEl) {
         btnDownloadAssetsEl.disabled = false;
@@ -257,7 +427,7 @@
       if (assetBannerEl) assetBannerEl.classList.remove("ready");
       if (assetBannerTitleEl) assetBannerTitleEl.textContent = "Data Download Notice — Level 3 Video Pack (~26.8 MB)";
       if (assetBannerDescEl) {
-        assetBannerDescEl.textContent = statusText || "Level 3 ('Why So Serious?') downloads/plays 8 video clips (~26.8 MB total). Download the pack below or use Level 2 ('Seriously?') to avoid video data usage.";
+        assetBannerDescEl.textContent = statusText || "Level 3 ('Why So Serious?') plays 8 vertical YouTube Reels (~26.8 MB total). Download/cache the pack below or use Level 2 ('Seriously?') to avoid video data usage.";
       }
       if (btnDownloadAssetsEl) {
         btnDownloadAssetsEl.disabled = videoPackDownloading;
@@ -271,7 +441,7 @@
     videoPackDownloading = true;
     let totalBytes = 0;
     let loadedFiles = 0;
-    updateAssetBannerUi(5, "Downloading 8 distraction clips (~26.8 MB)...");
+    updateAssetBannerUi(5, "Downloading 8 vertical distraction reels (~26.8 MB)...");
 
     for (let i = 0; i < DISTRACTION_FILES.length; i++) {
       const url = DISTRACTION_FILES[i];
@@ -284,7 +454,7 @@
         loadedFiles += 1;
         const pct = Math.round(((i + 1) / DISTRACTION_FILES.length) * 100);
         const mb = (totalBytes / (1024 * 1024)).toFixed(1);
-        updateAssetBannerUi(pct, "Downloaded " + loadedFiles + "/" + DISTRACTION_FILES.length + " clips (" + mb + " MB)...");
+        updateAssetBannerUi(pct, "Downloaded " + loadedFiles + "/" + DISTRACTION_FILES.length + " reels (" + mb + " MB)...");
       } catch (e) {
         console.warn("[asset-pack] fallback stream for", url, e);
       }
@@ -296,53 +466,47 @@
     updateAssetBannerUi(
       videoPackReady ? 100 : 0,
       videoPackReady
-        ? "Ready: " + loadedFiles + "/" + DISTRACTION_FILES.length + " clips loaded (" + mbDone + " MB). Level 3 unlocked."
+        ? "Ready: " + loadedFiles + "/" + DISTRACTION_FILES.length + " reels loaded (" + mbDone + " MB). Level 3 unlocked."
         : "Could not pre-download video pack. Use Level 2 ('Seriously?') or try again."
     );
   };
 
   function playRandomLevel3Clip() {
-    if (!arenaVideoEl || !videoStageBoxEl) return;
+    if (!reelVideoEl || !reelStageBoxEl) return;
     const idx = Math.floor(Math.random() * DISTRACTION_FILES.length);
     const src = cachedBlobUrls[idx] || DISTRACTION_FILES[idx];
-    videoStageBoxEl.style.display = "flex";
-    if (arenaStageEl) arenaStageEl.classList.add("video-split");
-    if (videoCaptionEl) videoCaptionEl.textContent = "Playing clip #" + (idx + 1) + " of " + DISTRACTION_FILES.length + " — stay composed!";
-
-    arenaVideoEl.srcObject = null;
-    arenaVideoEl.src = src;
-    arenaVideoEl.muted = false;
-    arenaVideoEl.play().catch(() => {
-      arenaVideoEl.muted = true;
-      arenaVideoEl.play().catch(() => {
-        if (stageStatusEl) stageStatusEl.textContent = "Tap play on video or fallback to Level 2 ('Seriously?').";
+    if (videoCaptionEl) {
+      videoCaptionEl.textContent = "Reel #" + (idx + 1) + " of " + DISTRACTION_FILES.length + " · Keep composure!";
+    }
+    reelVideoEl.src = src;
+    reelVideoEl.muted = false;
+    reelVideoEl.play().catch(() => {
+      reelVideoEl.muted = true;
+      reelVideoEl.play().catch(() => {
+        if (stageStatusEl) stageStatusEl.textContent = "Tap play on YouTube Reel or switch to Level 2.";
       });
     });
   }
 
-  function stopArenaVideo() {
-    if (arenaVideoEl) {
-      arenaVideoEl.pause();
-      if (!camStream) {
-        arenaVideoEl.removeAttribute("src");
-        arenaVideoEl.load();
-      }
+  function stopLevel3Reel() {
+    if (reelVideoEl) {
+      reelVideoEl.pause();
+      reelVideoEl.removeAttribute("src");
+      reelVideoEl.load();
     }
-    if (!camStream) {
-      if (videoStageBoxEl) videoStageBoxEl.style.display = "none";
-      if (arenaStageEl) arenaStageEl.classList.remove("video-split");
-      if (videoCaptionEl) videoCaptionEl.textContent = "";
-    }
+    if (reelStageBoxEl) reelStageBoxEl.style.display = "none";
+    if (videoCaptionEl) videoCaptionEl.textContent = "";
   }
 
-  if (arenaVideoEl) {
-    arenaVideoEl.addEventListener("error", () => {
+  if (reelVideoEl) {
+    reelVideoEl.addEventListener("error", () => {
       if (currentLevel === 3 && roundRunning) {
         videoErrorCount++;
         if (videoErrorCount >= 3) {
           currentLevel = 2;
-          stopArenaVideo();
-          if (stageStatusEl) stageStatusEl.textContent = "Video unavailable. Switched to Level 2 ('Seriously?') distractions.";
+          stopLevel3Reel();
+          if (arenaStageEl) arenaStageEl.className = "stage";
+          if (stageStatusEl) stageStatusEl.textContent = "Video unavailable. Switched to Level 2 ('Seriously?') distractors.";
           showAlert("LEVEL 2 FALLBACK");
         } else {
           setTimeout(() => {
@@ -353,35 +517,7 @@
     });
   }
 
-  window.toggleCameraPreview = async function () {
-    if (camStream) {
-      camStream.getTracks().forEach(t => t.stop());
-      camStream = null;
-      if (arenaVideoEl) arenaVideoEl.srcObject = null;
-      if (videoStageBoxEl) videoStageBoxEl.style.display = "none";
-      if (arenaStageEl) arenaStageEl.classList.remove("video-split");
-      if (stageStatusEl) stageStatusEl.textContent = "Local camera stopped.";
-      return;
-    }
-    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-      if (stageStatusEl) stageStatusEl.textContent = "Browser camera API not available on this device.";
-      return;
-    }
-    try {
-      camStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" }, audio: false });
-      if (arenaVideoEl) {
-        arenaVideoEl.removeAttribute("src");
-        arenaVideoEl.srcObject = camStream;
-        arenaVideoEl.muted = true;
-        arenaVideoEl.play().catch(() => {});
-      }
-      if (videoStageBoxEl) videoStageBoxEl.style.display = "flex";
-      if (arenaStageEl) arenaStageEl.classList.add("video-split");
-      if (stageStatusEl) stageStatusEl.textContent = "Local camera active on device (no frames sent to server).";
-    } catch (err) {
-      if (stageStatusEl) stageStatusEl.textContent = "Camera permission denied or unavailable.";
-    }
-  };
+  // --- REPLAY TIMELINE ---
 
   window.loadReplaySample = async function () {
     try {
@@ -550,7 +686,7 @@
       else if (cue.type === "ringtone") playRingtone();
       else if (cue.type === "car") playCar();
     } else if (currentLevel === 3) {
-      if (stageStatusEl) stageStatusEl.textContent = "Why So Serious? Watch clip & keep composure!";
+      if (stageStatusEl) stageStatusEl.textContent = "Why So Serious? Watch YouTube Reel & keep composure!";
       showAlert("FOCUS TEST");
     } else if (currentLevel === 4) {
       postScareUntilMs = Date.now() + 1800;
@@ -574,6 +710,64 @@
 
     updateReplayHud(elapsed);
 
+    // If camera is NOT active, drive penalties from SmartSpectra Replay timeline
+    if (!camStream && replayData && Array.isArray(replayData.samples) && replayData.samples.length > 0) {
+      const samples = replayData.samples;
+      const maxT = samples[samples.length - 1].t || 1;
+      const tMs = elapsed % maxT;
+      let cur = samples[0];
+      for (let i = 0; i < samples.length; i++) {
+        if (samples[i].t <= tMs) cur = samples[i];
+        else break;
+      }
+      if (cur) {
+        if (cur.blink && !lastReplayBlinkState) {
+          if (now - lastReplayBlinkTime > 2000) {
+            lastReplayBlinkTime = now;
+            const isScare = now < postScareUntilMs;
+            const pen = isScare ? 15 : 4;
+            blinks += 1;
+            composure = Math.max(0, composure - pen);
+            showAlert(isScare ? "REPLAY POST-SCARE -" + pen : "REPLAY BLINK -" + pen);
+          }
+        }
+        lastReplayBlinkState = Boolean(cur.blink);
+
+        if (cur.talk) {
+          replayTalkAccumMs += 16;
+          if (replayTalkAccumMs >= 2000 && (now - lastReplayTalkTime > 3000)) {
+            replayTalkAccumMs = 0;
+            lastReplayTalkTime = now;
+            talks += 1;
+            composure = Math.max(0, composure - 8);
+            showAlert("REPLAY TALK -8");
+          }
+        } else {
+          replayTalkAccumMs = Math.max(0, replayTalkAccumMs - 8);
+        }
+      }
+    }
+
+    // Breathing rate spike penalty (> 24 bpm) from SmartSpectra rates
+    if (replayData && Array.isArray(replayData.rates) && replayData.rates.length > 0) {
+      const maxT = replayData.rates[replayData.rates.length - 1].t || 1;
+      const tMs = elapsed % maxT;
+      let curRate = replayData.rates[0];
+      for (let j = 0; j < replayData.rates.length; j++) {
+        if (replayData.rates[j].t <= tMs) curRate = replayData.rates[j];
+        else break;
+      }
+      if (curRate && typeof curRate.value === "number") {
+        if (curRate.value > 24 && (now - lastRatePenaltyTime > 1500)) {
+          lastRatePenaltyTime = now;
+          rateSpikes += 1;
+          composure = Math.max(0, composure - 1);
+          showAlert("BREATHING SPIKE -1");
+        }
+      }
+    }
+
+    // Level-specific cues (cues trigger every 5s for Level 2, 3, 4)
     if (currentLevel >= 2) {
       const slot = Math.floor(elapsed / 5000);
       if (slot > lastTriggerSlot && slot > 0) {
@@ -591,7 +785,7 @@
     rafId = requestAnimationFrame(stepRound);
   }
 
-  function startRound(level, sec) {
+  async function startRound(level, sec) {
     let targetLevel = Number(level) || 1;
     if (targetLevel === 3 && !videoPackReady && !cachedBlobUrls.length) {
       updateAssetBannerUi(0, "Level 3 video pack (~26.8 MB) is not downloaded yet. Download it first or play Level 2.");
@@ -607,11 +801,20 @@
     if (arenaSubEl) arenaSubEl.textContent = meta.hint;
     if (stageStatusEl) stageStatusEl.textContent = meta.hint;
 
+    // Sizing & layout for games:
+    // Level 3 displays vertical reel alongside live camera tracker
+    // Levels 1, 2, 4 display camera tracker centered on stage
     if (currentLevel === 3) {
+      if (arenaStageEl) arenaStageEl.className = "stage level3-active";
+      if (reelStageBoxEl) reelStageBoxEl.style.display = "flex";
       playRandomLevel3Clip();
-    } else if (!camStream) {
-      stopArenaVideo();
+    } else {
+      if (arenaStageEl) arenaStageEl.className = "stage";
+      stopLevel3Reel();
     }
+
+    // Ensure camera is active and asking for permission
+    await window.ensureCameraActive();
 
     if (rafId) cancelAnimationFrame(rafId);
     roundRunning = true;
@@ -621,6 +824,10 @@
     rateSpikes = 0;
     lastTriggerSlot = 0;
     postScareUntilMs = 0;
+    lastReplayBlinkTime = 0;
+    lastReplayTalkTime = 0;
+    lastRatePenaltyTime = 0;
+    replayTalkAccumMs = 0;
     roundStartMs = Date.now();
     roundEndMs = roundStartMs + durationSec * 1000;
 
@@ -629,7 +836,7 @@
     rafId = requestAnimationFrame(stepRound);
   }
 
-  window.selectAndLaunchMode = function (level) {
+  window.selectAndLaunchMode = async function (level) {
     const durEl = document.getElementById("select-duration");
     const dur = durEl ? Number(durEl.value) : 30;
     if (Number(level) === 3 && !videoPackReady) {
@@ -640,11 +847,11 @@
       }
       return;
     }
-    startRound(level, dur);
+    await startRound(level, dur);
   };
 
-  window.startSoloNow = function () {
-    startRound(currentLevel, durationSec);
+  window.startSoloNow = async function () {
+    await startRound(currentLevel, durationSec);
   };
 
   window.simBlink = function () {
@@ -652,7 +859,7 @@
     const pen = Date.now() < postScareUntilMs ? 15 : 4;
     blinks += 1;
     composure = Math.max(0, composure - pen);
-    showAlert(pen === 15 ? "POST-SCARE -" + pen : "BLINK -" + pen);
+    showAlert(pen === 15 ? "POST-SCARE -" + pen : "MANUAL BLINK -" + pen);
     refreshArenaHud(Math.max(0, roundEndMs - Date.now()));
     if (composure <= 0) window.endRound(true);
   };
@@ -661,7 +868,7 @@
     if (!roundRunning) return;
     talks += 1;
     composure = Math.max(0, composure - 8);
-    showAlert("TALK -8");
+    showAlert("MANUAL TALK -8");
     refreshArenaHud(Math.max(0, roundEndMs - Date.now()));
     if (composure <= 0) window.endRound(true);
   };
@@ -684,7 +891,7 @@
     roundRunning = false;
     if (rafId) { cancelAnimationFrame(rafId); rafId = null; }
     if (jumpscareLayerEl) jumpscareLayerEl.classList.remove("active");
-    stopArenaVideo();
+    stopLevel3Reel();
     refreshArenaHud(0);
     if (stageStatusEl) {
       stageStatusEl.textContent = composure > 0
@@ -886,6 +1093,7 @@
       const dur = (payload && payload.duration) || durationSec;
       if (stageStatusEl) stageStatusEl.textContent = "Match starting in " + Math.ceil(delay / 1000) + "s...";
       showAlert("MATCH STARTING");
+      window.ensureCameraActive();
       window.setTab("arena");
       setTimeout(() => startRound(lvl, dur), delay);
     });
@@ -949,5 +1157,7 @@
     refreshArenaHud(30000);
     window.loadReplaySample();
     connectSocket();
+    // Proactively initialize camera preview
+    window.requestCameraPermission();
   });
 })();

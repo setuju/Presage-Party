@@ -278,36 +278,116 @@
 
     .stage {
       position: relative;
-      min-height: 260px;
+      min-height: 300px;
       border-radius: 16px;
       border: 1px solid var(--border);
       background: radial-gradient(circle at center, #172238 0%, #080c14 100%);
-      padding: 18px;
+      padding: 16px;
       display: grid;
-      grid-template-columns: 1fr;
-      gap: 14px;
+      grid-template-columns: 1.15fr 0.85fr;
+      gap: 16px;
       align-items: center;
+      justify-content: center;
       overflow: hidden;
     }
-    .stage.video-split {
-      grid-template-columns: 1.25fr 0.75fr;
+    .stage.level3-active {
+      grid-template-columns: 260px 1fr 200px;
     }
-    .video-box {
+    .reel-box {
       width: 100%;
-      border-radius: 12px;
+      max-width: 260px;
+      margin: 0 auto;
+      border-radius: 14px;
       overflow: hidden;
       background: #000;
       border: 1px solid var(--border);
-      aspect-ratio: 16 / 9;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      position: relative;
+    }
+    .reel-label {
+      width: 100%;
+      padding: 6px 10px;
+      font-size: 11px;
+      font-weight: 800;
+      background: rgba(15, 22, 35, 0.95);
+      color: var(--amber);
+      text-align: center;
+      border-bottom: 1px solid var(--border);
+    }
+    .reel-box video {
+      width: 100%;
+      aspect-ratio: 9 / 16;
+      max-height: 420px;
+      object-fit: contain;
+      background: #000;
+      display: block;
+    }
+    .camera-box {
+      width: 100%;
+      max-width: 380px;
+      margin: 0 auto;
+      border-radius: 14px;
+      overflow: hidden;
+      background: #070a10;
+      border: 1px solid var(--border);
+      position: relative;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+    }
+    .camera-box video {
+      width: 100%;
+      aspect-ratio: 4 / 3;
+      max-height: 320px;
+      object-fit: cover;
+      transform: scaleX(-1);
+      display: block;
+      background: #0b111c;
+    }
+    .cam-badge {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      padding: 4px 10px;
+      border-radius: 999px;
+      font-size: 11px;
+      font-weight: 800;
+      background: rgba(0, 0, 0, 0.75);
+      border: 1px solid rgba(74, 222, 128, 0.5);
+      color: var(--green);
       display: flex;
       align-items: center;
-      justify-content: center;
+      gap: 6px;
+      z-index: 5;
     }
-    .video-box video {
-      width: 100%;
-      height: 100%;
-      object-fit: cover;
-      display: block;
+    .cam-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--green);
+      display: inline-block;
+      animation: pulse 1.5s infinite;
+    }
+    @keyframes pulse {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.4; transform: scale(0.85); }
+    }
+    .motion-meter {
+      position: absolute;
+      bottom: 8px;
+      left: 8px;
+      right: 8px;
+      padding: 5px 10px;
+      border-radius: 8px;
+      font-size: 11px;
+      font-family: ui-monospace, monospace;
+      background: rgba(0, 0, 0, 0.82);
+      color: #e2e8f0;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      z-index: 5;
     }
     .stage-hud {
       text-align: center;
@@ -382,9 +462,20 @@
       body { padding: 10px; }
       .header { padding: 12px 14px; }
       .card { padding: 14px; }
-      .grid-2, .mode-grid, .stage.video-split { grid-template-columns: 1fr; }
+      .grid-2, .mode-grid { grid-template-columns: 1fr; }
       .hud-grid, .telemetry-strip { grid-template-columns: repeat(2, 1fr); }
       .row input, .row select, .row button { font-size: 13px; }
+      .stage, .stage.level3-active {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+        padding: 12px;
+      }
+      .reel-box { max-width: 230px; }
+      .reel-box video { max-height: 350px; }
+      .camera-box { max-width: 290px; }
+      .camera-box video { max-height: 230px; }
+      .stage-timer { font-size: 42px; }
     }
   </style>
 </head>
@@ -524,14 +615,30 @@
           <div class="alert-pop" id="alert-badge">FLINCH!</div>
           <div class="jumpscare-layer" id="jumpscare-layer">😱</div>
 
-          <div class="video-box" id="video-stage-box" style="display:none;">
-            <video id="arena-video" playsinline controls></video>
+          <!-- LEVEL 3: YOUTUBE REEL VERTICAL PLAYER (9:16) -->
+          <div class="reel-box" id="reel-stage-box" style="display:none;">
+            <div class="reel-label">⚡ YouTube Reel Challenge</div>
+            <video id="reel-video" playsinline controls></video>
+            <div class="muted" id="video-caption" style="margin-top:4px;font-size:11px;text-align:center;"></div>
           </div>
 
-          <div class="stage-hud">
+          <!-- CAMERA BOX: REAL-TIME HUMAN SIGNAL & FLINCH TRACKER -->
+          <div class="camera-box" id="camera-stage-box">
+            <div class="cam-badge" id="cam-status-badge">
+              <span class="cam-dot" id="cam-dot"></span>
+              <span id="cam-badge-text">CAMERA LIVE · FLINCH TRACKER</span>
+            </div>
+            <video id="camera-video" playsinline muted autoplay></video>
+            <div class="motion-meter" id="motion-meter-bar">
+              <span id="motion-text">Motion: 0.0 (Calm)</span>
+              <span id="signal-text">Signals: Live Camera (Tracking)</span>
+            </div>
+          </div>
+
+          <!-- STAGE HUD -->
+          <div class="stage-hud" id="stage-hud">
             <div class="stage-timer" id="stage-timer">30</div>
-            <div class="stage-status" id="stage-status">Select a mode or start from Room Master</div>
-            <div class="muted" id="video-caption" style="margin-top:6px;"></div>
+            <div class="stage-status" id="stage-status">Camera ready — stay composed and don't flinch!</div>
           </div>
         </div>
 
@@ -544,10 +651,10 @@
 
         <div class="row" style="margin-top:14px;margin-bottom:0;">
           <button type="button" class="btn btn-primary" onclick="window.startSoloNow()">Start Solo Mode</button>
-          <button type="button" class="btn" id="btn-cam" onclick="window.toggleCameraPreview()">Local Camera (Opt)</button>
+          <button type="button" class="btn" id="btn-cam" onclick="window.toggleCameraPreview()">📷 Camera: ON</button>
           <button type="button" class="btn" onclick="window.loadReplaySample()">Load Replay Metrics</button>
-          <button type="button" class="btn btn-m2" onclick="window.simBlink()">Log Blink (-4)</button>
-          <button type="button" class="btn btn-m3" onclick="window.simTalk()">Log Talk (-8)</button>
+          <button type="button" class="btn btn-m2" onclick="window.simBlink()">Manual Blink (-4)</button>
+          <button type="button" class="btn btn-m3" onclick="window.simTalk()">Manual Talk (-8)</button>
           <button type="button" class="btn btn-danger" onclick="window.endRound(true)">Finish &amp; Submit</button>
         </div>
       </div>
@@ -579,6 +686,6 @@
   </div>
 
   <script src="./socket.io.min.js"></script>
-  <script src="./web-client.js?v=20261122f"></script>
+  <script src="./web-client.js?v=20261122g"></script>
 </body>
 </html>

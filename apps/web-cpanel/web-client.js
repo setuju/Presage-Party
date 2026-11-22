@@ -1,8 +1,24 @@
 (function () {
   const SERVER_URLS = [
     "https://finchparty.saturumah.net",
-    "https://presage-party.onrender.com"
+    "https://presage-party.onrender.com",
+    "https://presage-party.enzonic.dev"
   ];
+
+  // Optional manual override via ?server=render | local | <url>
+  try {
+    const urlParams = new URLSearchParams(window.location.search);
+    const explicitServer = urlParams.get("server");
+    if (explicitServer) {
+      if (explicitServer === "render") {
+        SERVER_URLS.unshift("https://presage-party.onrender.com");
+      } else if (explicitServer === "local") {
+        SERVER_URLS.unshift("http://127.0.0.1:3000");
+      } else if (explicitServer.startsWith("http")) {
+        SERVER_URLS.unshift(explicitServer);
+      }
+    }
+  } catch (e) {}
 
   const DISTRACTION_FILES = [
     "./assets/distractions/distraction_1.mp4",
@@ -16,11 +32,22 @@
   ];
 
   const MODE_META = {
-    1: { name: "Chill Mode", hint: "Steady composure. No distractions." },
+    1: { name: "Chill Mode", hint: "Steady composure. Baseline round." },
     2: { name: "Seriously?", hint: "Audio & text distractions active." },
     3: { name: "Why So Serious?", hint: "Video challenge active. Keep composure!" },
     4: { name: "Don't Scream", hint: "Scare cues active. Post-scare flinches cost -15." }
   };
+
+  const DISTRACTION_CUES = [
+    { type: "speech", text: "Look behind you!" },
+    { type: "speech", text: "Don't blink. Keep composure!" },
+    { type: "ringtone", text: "Brrring! Brrring!" },
+    { type: "speech", text: "Are you nervous?" },
+    { type: "car", text: "Vroooom! Sound incoming!" },
+    { type: "speech", text: "Steady focus... stay composed!" }
+  ];
+
+  const SCARY_FACES = ["😱", "👹", "💀", "👻", "😈"];
 
   let socket = null;
   let serverIndex = 0;
@@ -51,7 +78,10 @@
   let rafId = null;
   let camStream = null;
   let replayData = null;
+  let videoErrorCount = 0;
+  let audioCtx = null;
 
+  // DOM Elements
   const connStatusEl = document.getElementById("conn-status");
   const pillModeEl = document.getElementById("pill-mode");
   const pillRoleEl = document.getElementById("pill-role");
@@ -62,6 +92,7 @@
   const activeRoomCodeEl = document.getElementById("active-room-code");
   const playerListEl = document.getElementById("player-list");
   const btnStartMpEl = document.getElementById("btn-start-mp");
+  const btnLeaveRoomEl = document.getElementById("btn-leave-room");
 
   const assetBannerEl = document.getElementById("asset-banner");
   const assetBannerTitleEl = document.getElementById("asset-banner-title");
@@ -92,6 +123,103 @@
   const telRateEl = document.getElementById("tel-rate");
   const telBlinkEl = document.getElementById("tel-blink");
   const telTalkEl = document.getElementById("tel-talk");
+
+  // Web Audio Synthesizer (for distraction and scare cues)
+  function getAudioContext() {
+    if (!audioCtx) {
+      const AudioCtx = window.AudioContext || window.webkitAudioContext;
+      if (AudioCtx) audioCtx = new AudioCtx();
+    }
+    if (audioCtx && audioCtx.state === "suspended") {
+      audioCtx.resume().catch(() => {});
+    }
+    return audioCtx;
+  }
+
+  function playRingtone() {
+    const ctx = getAudioContext();
+    if (!ctx) return;
+    try {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = "sine";
+      osc.frequency.setValueAtTime(880, ctx.currentTime);
+      gain.gain.setValueAtTime(0.12, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.45);
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start();
+      osc.stop(ctx.currentTime + 0.45);
+      setTimeout(() => {
+        if (!ctx) return;
+        const osc2 = ctx.createOscillator();
+        const gain2 = ctx.createGain();
+        osc2.type = "sine";
+        osc2.frequency.setValueAtTime(880, ctx.currentTime);
+        gain2.gain.setValueAtTime(0.12, ctx.currentTime);
+        gain2.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.45);
+        osc2.connect(gain2);
+        gain2.connect(ctx.destination);
+        osc2.start();
+        osc2.stop(ctx.currentTime + 0.45);
+      }, 550);
+    } catch (e) {}
+  }
+
+  function playCar() {
+    const ctx = getAudioContext();
+    if (!ctx) return;
+    try {
+      const bufferSize = ctx.sampleRate * 1.4;
+      const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
+      const data = buffer.getChannelData(0);
+      for (let i = 0; i < bufferSize; i++) data[i] = Math.random() * 2 - 1;
+      const noise = ctx.createBufferSource();
+      noise.buffer = buffer;
+      const filter = ctx.createBiquadFilter();
+      filter.type = "lowpass";
+      filter.frequency.setValueAtTime(200, ctx.currentTime);
+      filter.frequency.linearRampToValueAtTime(750, ctx.currentTime + 0.7);
+      filter.frequency.linearRampToValueAtTime(200, ctx.currentTime + 1.4);
+      const gain = ctx.createGain();
+      gain.gain.setValueAtTime(0.001, ctx.currentTime);
+      gain.gain.linearRampToValueAtTime(0.16, ctx.currentTime + 0.35);
+      gain.gain.linearRampToValueAtTime(0.001, ctx.currentTime + 1.4);
+      noise.connect(filter);
+      filter.connect(gain);
+      gain.connect(ctx.destination);
+      noise.start();
+    } catch (e) {}
+  }
+
+  function playScream() {
+    const ctx = getAudioContext();
+    if (!ctx) return;
+    try {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = "sawtooth";
+      osc.frequency.setValueAtTime(880, ctx.currentTime);
+      osc.frequency.exponentialRampToValueAtTime(120, ctx.currentTime + 0.65);
+      gain.gain.setValueAtTime(0.3, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.65);
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start();
+      osc.stop(ctx.currentTime + 0.65);
+    } catch (e) {}
+  }
+
+  function playSpeech(text) {
+    if ("speechSynthesis" in window) {
+      try {
+        const utter = new SpeechSynthesisUtterance(text);
+        utter.lang = "en-US";
+        utter.rate = 1.05;
+        window.speechSynthesis.speak(utter);
+      } catch (e) {}
+    }
+  }
 
   window.setTab = function (tabId) {
     document.querySelectorAll(".tab").forEach(btn => {
@@ -207,6 +335,24 @@
     }
   }
 
+  if (arenaVideoEl) {
+    arenaVideoEl.addEventListener("error", () => {
+      if (currentLevel === 3 && roundRunning) {
+        videoErrorCount++;
+        if (videoErrorCount >= 3) {
+          currentLevel = 2;
+          stopArenaVideo();
+          if (stageStatusEl) stageStatusEl.textContent = "Video unavailable. Switched to Level 2 ('Seriously?') distractions.";
+          showAlert("LEVEL 2 FALLBACK");
+        } else {
+          setTimeout(() => {
+            if (currentLevel === 3 && roundRunning) playRandomLevel3Clip();
+          }, 1000);
+        }
+      }
+    });
+  }
+
   window.toggleCameraPreview = async function () {
     if (camStream) {
       camStream.getTracks().forEach(t => t.stop());
@@ -287,7 +433,17 @@
 
   function updateRoleUi() {
     const isHost = role === "host";
-    if (btnStartMpEl) btnStartMpEl.disabled = !(roomCode && isHost);
+    if (btnLeaveRoomEl) {
+      btnLeaveRoomEl.style.display = roomCode ? "inline-flex" : "none";
+    }
+    if (btnStartMpEl) {
+      btnStartMpEl.disabled = !(roomCode && isHost && players.length >= 2);
+      if (roomCode && isHost && players.length < 2) {
+        btnStartMpEl.title = "Waiting for a 2nd player to join before starting match.";
+      } else {
+        btnStartMpEl.title = "";
+      }
+    }
     if (pillRoleEl) {
       if (isHost) pillRoleEl.textContent = "ROLE: 👑 ROOM MASTER";
       else if (role === "guest") pillRoleEl.textContent = "ROLE: 🎮 GUEST";
@@ -387,19 +543,25 @@
 
   function triggerModeCue(slot) {
     if (currentLevel === 2) {
-      const cues = ["Do not flinch.", "Stay steady!", "Are you calm?", "Keep composure!"];
-      if (stageStatusEl) stageStatusEl.textContent = cues[slot % cues.length];
+      const cue = DISTRACTION_CUES[slot % DISTRACTION_CUES.length];
+      if (stageStatusEl) stageStatusEl.textContent = cue.text;
       showAlert("DISTRACTION");
+      if (cue.type === "speech") playSpeech(cue.text);
+      else if (cue.type === "ringtone") playRingtone();
+      else if (cue.type === "car") playCar();
     } else if (currentLevel === 3) {
-      if (stageStatusEl) stageStatusEl.textContent = "Why So Serious? Watch & keep composure!";
+      if (stageStatusEl) stageStatusEl.textContent = "Why So Serious? Watch clip & keep composure!";
       showAlert("FOCUS TEST");
     } else if (currentLevel === 4) {
       postScareUntilMs = Date.now() + 1800;
+      const face = SCARY_FACES[slot % SCARY_FACES.length];
       if (jumpscareLayerEl) {
+        jumpscareLayerEl.textContent = face;
         jumpscareLayerEl.classList.add("active");
         setTimeout(() => jumpscareLayerEl.classList.remove("active"), 550);
       }
-      if (stageStatusEl) stageStatusEl.textContent = "JUMPSCARE! Do not flinch!";
+      playScream();
+      if (stageStatusEl) stageStatusEl.textContent = "SCARE CUE! Post-scare blink penalty is -15!";
       showAlert("SCARE CUE!");
     }
   }
@@ -437,6 +599,7 @@
 
     currentLevel = targetLevel;
     durationSec = Number(sec) || 30;
+    videoErrorCount = 0;
     const meta = MODE_META[currentLevel] || MODE_META[1];
 
     if (pillModeEl) pillModeEl.textContent = "MODE: " + meta.name.toUpperCase();
@@ -541,7 +704,7 @@
     const passEl = document.getElementById("input-pass");
     playerName = (nameEl && nameEl.value.trim()) || "Jack";
     if (!socket || !socket.connected) {
-      if (lobbyMsgEl) lobbyMsgEl.textContent = "Connecting to server... try again in a second.";
+      if (lobbyMsgEl) lobbyMsgEl.textContent = "Connecting to server... try again in a moment.";
       return;
     }
     socket.emit("create_room", {
@@ -582,9 +745,31 @@
     });
   };
 
+  window.leaveRoom = function () {
+    if (!roomCode) return;
+    roomCode = "";
+    role = "solo";
+    players = [];
+    const codeEl = document.getElementById("input-code");
+    if (codeEl) codeEl.value = "";
+    updateRoleUi();
+    renderPlayers();
+    if (lobbyMsgEl) lobbyMsgEl.textContent = "Left room. You are now in Solo mode.";
+    showAlert("LEFT ROOM");
+    if (socket && socket.connected) {
+      socket.disconnect();
+      socket.connect();
+    }
+  };
+
   window.startMultiplayerRound = function () {
     if (!roomCode || role !== "host") {
       if (lobbyMsgEl) lobbyMsgEl.textContent = "Only the 👑 ROOM MASTER can start the multiplayer round.";
+      return;
+    }
+    if (players.length < 2) {
+      if (lobbyMsgEl) lobbyMsgEl.textContent = "Wait for a 2nd player to join before starting.";
+      showAlert("WAITING FOR GUEST");
       return;
     }
     const durEl = document.getElementById("select-duration");
@@ -598,6 +783,17 @@
     }
   };
 
+  // Visibility and Anti-cheat integration
+  document.addEventListener("visibilitychange", () => {
+    const isVisible = document.visibilityState === "visible";
+    if (socket && socket.connected) {
+      socket.emit("visibility_change", isVisible);
+    }
+    if (!isVisible && roundRunning) {
+      showAlert("WINDOW MINIMIZED");
+    }
+  });
+
   function connectSocket() {
     if (typeof window.io !== "function") return;
     const target = SERVER_URLS[serverIndex];
@@ -608,17 +804,20 @@
       socket.disconnect();
     }
 
+    const isLastServer = serverIndex >= SERVER_URLS.length - 1;
     socket = window.io(target, {
-      transports: ["websocket", "polling"],
-      timeout: 4500,
-      reconnection: true,
-      reconnectionAttempts: 2
+      transports: ["polling", "websocket"],
+      timeout: isLastServer ? 5000 : 2500,
+      reconnection: isLastServer,
+      reconnectionAttempts: isLastServer ? 5 : 0
     });
 
     socket.on("connect", () => {
+      const serverLabel = target.includes("finchparty") ? " (Primary)" : (target.includes("onrender") ? " (Render Cloud)" : "");
       if (connStatusEl) {
-        connStatusEl.textContent = "Connected: " + target + (serverIndex === 0 ? " (Primary)" : " (Fallback)");
+        connStatusEl.textContent = "Connected: " + target + serverLabel;
       }
+      if (socket.io) socket.io.opts.reconnection = true;
       socket.emit("get_rooms");
       if (pollTimer) clearInterval(pollTimer);
       pollTimer = setInterval(() => {
@@ -626,12 +825,13 @@
       }, 3500);
     });
 
-    socket.on("connect_error", () => {
+    socket.on("connect_error", (err) => {
+      console.warn("[socket] connect_error for " + target, err);
       if (serverIndex + 1 < SERVER_URLS.length) {
         serverIndex += 1;
         connectSocket();
       } else if (connStatusEl) {
-        connStatusEl.textContent = "Server unreachable right now.";
+        connStatusEl.textContent = "Server offline. Solo mode active.";
       }
     });
 
@@ -650,6 +850,7 @@
       renderPlayers();
       recordScore(playerName, 0, "host");
       if (lobbyMsgEl) lobbyMsgEl.textContent = "👑 Room " + roomCode + " created. You are Room Master.";
+      showAlert("ROOM " + roomCode + " CREATED");
       socket.emit("get_rooms");
     });
 
@@ -665,14 +866,17 @@
       if (lobbyMsgEl) {
         lobbyMsgEl.textContent = "🎮 Joined room " + roomCode + " (Host: " + ((data && data.hostName) || "Room Master") + ").";
       }
+      showAlert("JOINED ROOM " + roomCode);
     });
 
     socket.on("player_joined", (p) => {
       if (p && p.name && !players.some(x => x.name === p.name)) {
         players.push({ name: p.name, role: "guest" });
+        updateRoleUi();
         renderPlayers();
       }
       if (lobbyMsgEl) lobbyMsgEl.textContent = ((p && p.name) || "Player") + " joined room " + roomCode + ".";
+      showAlert(((p && p.name) || "Player") + " JOINED");
     });
 
     socket.on("game_start", (payload) => {
@@ -680,7 +884,8 @@
       const delay = Math.max(0, startAt - Date.now());
       const lvl = (payload && payload.level) || currentLevel;
       const dur = (payload && payload.duration) || durationSec;
-      if (stageStatusEl) stageStatusEl.textContent = "Starting round...";
+      if (stageStatusEl) stageStatusEl.textContent = "Match starting in " + Math.ceil(delay / 1000) + "s...";
+      showAlert("MATCH STARTING");
       window.setTab("arena");
       setTimeout(() => startRound(lvl, dur), delay);
     });
@@ -692,7 +897,46 @@
       if (payload && payload.guestName && payload.guest) {
         recordScore(payload.guestName, payload.guest.score || 0, "guest");
       }
+      const winner = payload && payload.winner;
+      const winnerMsg = winner === "tie"
+        ? "Match ended in a tie!"
+        : (winner === role ? "🏆 You won the match!" : "Match finished.");
+      if (stageStatusEl) stageStatusEl.textContent = winnerMsg;
+      showAlert(winnerMsg);
       window.setTab("scoreboard");
+    });
+
+    socket.on("cheat_penalty", (amount) => {
+      const pen = Number(amount) || 10;
+      composure = Math.max(0, composure - pen);
+      if (stageStatusEl) stageStatusEl.textContent = "FOCUS! Penalty applied (-" + pen + "% composure).";
+      showAlert("-" + pen + "% FOCUS PENALTY");
+      refreshArenaHud(Math.max(0, roundEndMs - Date.now()));
+      if (composure <= 0) window.endRound(true);
+    });
+
+    socket.on("opponent_cheated", () => {
+      if (stageStatusEl) stageStatusEl.textContent = "Opponent tab minimized — penalty applied!";
+      showAlert("OPPONENT PENALIZED");
+    });
+
+    socket.on("host_migrated", (newHostId) => {
+      if (socket && socket.id === newHostId) {
+        role = "host";
+        players = players.map(p => (p.name === playerName ? { ...p, role: "host" } : p));
+        updateRoleUi();
+        renderPlayers();
+        if (lobbyMsgEl) lobbyMsgEl.textContent = "Host disconnected. You are now 👑 ROOM MASTER.";
+        showAlert("YOU ARE NOW HOST");
+      }
+    });
+
+    socket.on("opponent_left", () => {
+      players = players.filter(p => p.name === playerName || p.role === "host");
+      updateRoleUi();
+      renderPlayers();
+      if (lobbyMsgEl) lobbyMsgEl.textContent = "Opponent left the room. Waiting for new player...";
+      showAlert("OPPONENT LEFT");
     });
   }
 

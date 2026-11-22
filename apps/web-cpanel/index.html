@@ -6,40 +6,67 @@
   <title>Presage Party — Game & Multiplayer Lobby</title>
   <style>
     body { font-family: system-ui, -apple-system, sans-serif; background: #0b0d12; color: #f3f4f6; margin: 0; padding: 18px; }
-    .box { max-width: 840px; margin: 0 auto; background: #141821; border: 1px solid #262d3d; border-radius: 12px; padding: 20px; }
+    .box { max-width: 900px; margin: 0 auto; background: #141821; border: 1px solid #262d3d; border-radius: 12px; padding: 20px; }
     h1 { margin: 0 0 6px; font-size: 24px; }
     .muted { color: #9ca3af; font-size: 13px; margin-bottom: 12px; }
     .row { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin-bottom: 12px; }
     input, select { background: #0b0d12; border: 1px solid #2d3548; color: #fff; padding: 10px 12px; border-radius: 8px; font-size: 14px; }
-    button { background: #2563eb; color: #fff; border: none; padding: 10px 15px; border-radius: 8px; font-weight: 600; cursor: pointer; touch-action: manipulation; }
+    button { background: #2563eb; color: #fff; border: none; padding: 10px 14px; border-radius: 8px; font-weight: 600; cursor: pointer; touch-action: manipulation; }
+    button:disabled { opacity: 0.45; cursor: not-allowed; }
     button.secondary { background: #1f2937; border: 1px solid #374151; }
     button.danger { background: #991b1b; border: 1px solid #ef4444; }
     button.lvl { background: #1e293b; border: 1px solid #3b82f6; }
     button.lvl.active { background: #2563eb; border-color: #93c5fd; }
     .panel { background: #0b0d12; border: 1px solid #222938; border-radius: 10px; padding: 14px; margin-top: 14px; }
     .hud { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin: 12px 0; }
+    .metrics-bar { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 10px; }
+    .metric-chip { background: #111622; border: 1px solid #242c3d; border-radius: 8px; padding: 8px 10px; font-size: 12px; color: #cbd5e1; display: flex; justify-content: space-between; }
     .stat { background: #141821; border: 1px solid #262d3d; border-radius: 8px; padding: 10px; text-align: center; }
     .stat-val { font-size: 20px; font-weight: 800; color: #4ade80; }
     #distraction-banner { min-height: 36px; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 15px; border-radius: 8px; background: #111622; border: 1px dashed #334155; padding: 8px; margin: 10px 0; color: #fbbf24; text-align: center; }
-    #game-arena { position: relative; height: 220px; background: radial-gradient(circle at center, #172033 0%, #090c12 100%); border: 1px solid #2b354b; border-radius: 10px; overflow: hidden; margin-top: 10px; user-select: none; }
+    .arena-grid { display: grid; grid-template-columns: 1.45fr 1fr; gap: 12px; margin-top: 10px; }
+    #game-arena { position: relative; height: 230px; background: radial-gradient(circle at center, #172033 0%, #090c12 100%); border: 1px solid #2b354b; border-radius: 10px; overflow: hidden; user-select: none; }
     #game-arena.flash-alert { border-color: #ef4444; box-shadow: inset 0 0 28px rgba(239, 68, 68, 0.35); }
-    #focus-orb { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); width: 68px; height: 68px; border-radius: 50%; background: #22c55e; color: #052e16; font-weight: 900; font-size: 12px; display: flex; align-items: center; justify-content: center; text-align: center; cursor: pointer; box-shadow: 0 0 18px rgba(34, 197, 94, 0.55); touch-action: manipulation; }
-    .hazard-decoy { position: absolute; padding: 6px 10px; border-radius: 6px; background: rgba(239, 68, 68, 0.2); border: 1px solid #f87171; color: #fca5a5; font-weight: 800; font-size: 12px; pointer-events: none; }
-    video { width: 100%; max-height: 240px; background: #000; border-radius: 8px; margin-top: 10px; }
-    @media (max-width: 640px) { .hud { grid-template-columns: repeat(2, 1fr); } }
+    #focus-orb { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); width: 66px; height: 66px; border-radius: 50%; background: #22c55e; color: #052e16; font-weight: 900; font-size: 12px; display: flex; align-items: center; justify-content: center; text-align: center; cursor: pointer; box-shadow: 0 0 18px rgba(34, 197, 94, 0.55); touch-action: manipulation; }
+    .hazard-decoy { position: absolute; padding: 6px 10px; border-radius: 6px; background: rgba(239, 68, 68, 0.22); border: 1px solid #f87171; color: #fca5a5; font-weight: 800; font-size: 12px; pointer-events: none; }
+    .math-box { background: #111622; border: 1px solid #273249; border-radius: 10px; padding: 12px; display: flex; flex-direction: column; justify-content: space-between; }
+    .math-q { font-size: 20px; font-weight: 800; color: #93c5fd; margin: 6px 0; }
+    .roster-item { display: flex; justify-content: space-between; align-items: center; padding: 8px 10px; border-radius: 8px; background: #111622; border: 1px solid #232b3c; margin-bottom: 6px; }
+    .badge-host { background: rgba(250, 204, 21, 0.16); color: #fde047; border: 1px solid #eab308; padding: 2px 8px; border-radius: 999px; font-size: 11px; font-weight: 700; }
+    .badge-guest { background: rgba(56, 189, 248, 0.15); color: #7dd3fc; border: 1px solid #0284c7; padding: 2px 8px; border-radius: 999px; font-size: 11px; font-weight: 700; }
+    .badge-you { background: rgba(74, 222, 128, 0.15); color: #86efac; border: 1px solid #22c55e; padding: 2px 8px; border-radius: 999px; font-size: 11px; font-weight: 700; margin-left: 6px; }
+    video { width: 100%; max-height: 230px; background: #000; border-radius: 8px; margin-top: 10px; }
+    @media (max-width: 720px) { .arena-grid { grid-template-columns: 1fr; } .hud { grid-template-columns: repeat(2, 1fr); } .metrics-bar { grid-template-columns: 1fr; } }
   </style>
 </head>
 <body>
   <div class="box">
-    <h1>Presage Party Web Client</h1>
-    <div class="muted" id="mp-server-info">Preparing server connection...</div>
+    <div class="row" style="justify-content:space-between;align-items:flex-start;">
+      <div>
+        <h1>Presage Party Web Client</h1>
+        <div class="muted" id="mp-server-info">Preparing server connection...</div>
+      </div>
+      <button type="button" class="secondary" onclick="window.toggleGameHelper()">? Game Helper</button>
+    </div>
+
     <div id="mp-status" style="font-weight:600;margin-bottom:14px;">Initializing...</div>
+
+    <div id="game-helper-panel" class="panel" style="display:none;border-color:#3b82f6;">
+      <strong>Game Helper — How to Play Presage Party</strong>
+      <ul class="muted" style="margin:8px 0 0 18px;line-height:1.55;">
+        <li><strong>Levels 1–4 &amp; Tempo:</strong> Higher levels increase orb movement speed, distractions, and scoring multiplier.</li>
+        <li><strong>Focus Math &amp; Reflexes:</strong> Tap the green <b>TAP FOCUS</b> orb while solving quick math prompts in the right panel to earn bonus points and recover composure.</li>
+        <li><strong>Composure, Blink, Talk &amp; Rate:</strong> Keep Composure above 0. Flinching, frequent blinks (-4), sustained talking (-8), unstable rate, or switching tabs/minimizing penalizes Composure.</li>
+        <li><strong>Room Master Rule:</strong> Only the <b>👑 ROOM MASTER</b> (creator) can trigger <b>Start Game</b> for the room. Joined players (<b>🎮 GUEST</b>) wait for the Room Master or play Solo when not in a room.</li>
+        <li><strong>Camera Transparency:</strong> Camera preview runs locally in your browser (no frames uploaded to server, no biometric data stored). Simulation triggers (flinch/blink/talk) still occur even when camera is off.</li>
+      </ul>
+    </div>
 
     <div class="row">
       <input id="player-name" type="text" placeholder="Player name" value="Jack" />
       <button type="button" onclick="window.createGameRoom()">Create Room</button>
       <button type="button" class="secondary" onclick="window.refreshRooms()">Refresh Rooms</button>
-      <button type="button" class="secondary" onclick="window.startMultiplayerFromHost()">Host Start Game</button>
+      <button type="button" id="btn-host-start" onclick="window.startMultiplayerFromHost()">Start Game (Room Master)</button>
     </div>
 
     <div class="row">
@@ -49,7 +76,15 @@
     </div>
 
     <div class="panel">
-      <strong>Select Game Level</strong>
+      <div class="row" style="justify-content:space-between;margin-bottom:6px;">
+        <strong>Room Waiting List &amp; Players</strong>
+        <span id="my-role-badge" class="badge-guest">SOLO / UNASSIGNED</span>
+      </div>
+      <div id="room-waiting-list">Not in a room yet. Create or join a room to see members.</div>
+    </div>
+
+    <div class="panel">
+      <strong>Select Game Level &amp; Mode</strong>
       <div class="row" style="margin-top:10px;">
         <button type="button" id="btn-lvl-1" class="lvl active" onclick="window.selectGameLevel(1)">Level 1 — Calm Focus</button>
         <button type="button" id="btn-lvl-2" class="lvl" onclick="window.selectGameLevel(2)">Level 2 — Distraction</button>
@@ -66,6 +101,8 @@
         <button type="button" id="btn-start-game" onclick="window.startSoloGame()">Start Game</button>
         <button type="button" class="danger" onclick="window.stopGameRound()">Stop &amp; Submit Score</button>
         <button type="button" class="secondary" onclick="window.triggerFlinchEvent()">Simulate Flinch (-15)</button>
+        <button type="button" class="secondary" onclick="window.triggerBlinkEvent()">Blink (-4)</button>
+        <button type="button" class="secondary" onclick="window.triggerTalkEvent()">Talk (-8)</button>
       </div>
 
       <div class="hud">
@@ -75,10 +112,29 @@
         <div class="stat"><div class="muted" style="margin:0;">Score</div><div class="stat-val" id="hud-score">0</div></div>
       </div>
 
+      <div class="metrics-bar">
+        <div class="metric-chip"><span>Blinks (-4)</span><strong id="metric-blinks">0</strong></div>
+        <div class="metric-chip"><span>Talks (-8)</span><strong id="metric-talks">0</strong></div>
+        <div class="metric-chip"><span>Focus Rate</span><strong id="metric-rate">Steady</strong></div>
+      </div>
+
       <div id="distraction-banner">Ready to play. Select a level and click Start Game.</div>
 
-      <div id="game-arena">
-        <div id="focus-orb" onclick="window.tapFocusOrb()">TAP<br/>FOCUS</div>
+      <div class="arena-grid">
+        <div id="game-arena">
+          <div id="focus-orb" onclick="window.tapFocusOrb()">TAP<br/>FOCUS</div>
+        </div>
+        <div class="math-box">
+          <div>
+            <div class="muted" style="margin:0;">Focus Math Challenge (Bonus +30 &amp; +3 Composure)</div>
+            <div id="math-question" class="math-q">7 + 5 = ?</div>
+          </div>
+          <div class="row" style="margin-bottom:0;">
+            <input id="math-answer" type="number" placeholder="Answer" style="width:110px;" onkeydown="if(event.key==='Enter'){window.submitMathAnswer();}" />
+            <button type="button" onclick="window.submitMathAnswer()">Solve</button>
+          </div>
+          <div id="math-feedback" class="muted" style="margin:6px 0 0;">Solve prompts while dodging distractions.</div>
+        </div>
       </div>
     </div>
 
@@ -93,12 +149,12 @@
         <button type="button" class="secondary" onclick="window.enableLocalCamera()">Enable Local Camera</button>
         <button type="button" class="secondary" onclick="window.disableLocalCamera()">Disable Camera</button>
       </div>
-      <div id="cam-status" class="muted" style="margin-bottom:6px;">Local camera is off. (Game works without camera.)</div>
+      <div id="cam-status" class="muted" style="margin-bottom:6px;">Local camera is off. (Simulation events run independently of camera.)</div>
       <video id="local-cam-preview" autoplay playsinline muted></video>
     </div>
   </div>
 
   <script src="./socket.io.min.js"></script>
-  <script src="./web-client.js"></script>
+  <script src="./web-client.js?v=20261122b"></script>
 </body>
 </html>

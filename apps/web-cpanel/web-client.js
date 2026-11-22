@@ -4,16 +4,38 @@
     "https://presage-party.enzonic.dev"
   ];
 
+  const LEVEL_PROMPTS = {
+    1: ["Tetap tenang...", "Jangan berkedip terlalu sering!", "Jaga fokus Anda."],
+    2: ["FLASH DISTRACTION!", "Suara & visual muncul tiba-tiba!", "Pertahankan composure!"],
+    3: ["CHAOS RUSH!", "Kecepatan distraksi meningkat!", "Tetap stabil!"],
+    4: ["FLINCH ROYALE!", "Mode intensitas maksimal!", "Jangan lengah sedikit pun!"]
+  };
+
   let socket = null;
   let serverIndex = 0;
   let cameraStream = null;
   let myRole = "guest";
+  let currentRoomCode = "";
+
+  let selectedLevel = 1;
+  let gameRunning = false;
+  let composure = 100;
+  let score = 0;
+  let flinchCount = 0;
+  let remainingSec = 0;
+  let tickTimer = null;
+  let promptTimer = null;
 
   const statusEl = document.getElementById("mp-status");
   const serverInfoEl = document.getElementById("mp-server-info");
   const roomListEl = document.getElementById("room-list");
   const camVideoEl = document.getElementById("local-cam-preview");
   const camStatusEl = document.getElementById("cam-status");
+  const hudLevelEl = document.getElementById("hud-level");
+  const hudTimeEl = document.getElementById("hud-time");
+  const hudComposureEl = document.getElementById("hud-composure");
+  const hudScoreEl = document.getElementById("hud-score");
+  const bannerEl = document.getElementById("distraction-banner");
 
   function setStatus(msg, color) {
     if (statusEl) {
@@ -23,10 +45,100 @@
   }
 
   function setServerInfo(msg) {
-    if (serverInfoEl) {
-      serverInfoEl.textContent = msg;
-    }
+    if (serverInfoEl) serverInfoEl.textContent = msg;
   }
+
+  function updateHud() {
+    if (hudLevelEl) hudLevelEl.textContent = String(selectedLevel);
+    if (hudTimeEl) hudTimeEl.textContent = Math.max(0, remainingSec) + "s";
+    if (hudComposureEl) hudComposureEl.textContent = String(Math.max(0, Math.round(composure)));
+    if (hudScoreEl) hudScoreEl.textContent = String(Math.max(0, Math.round(score)));
+  }
+
+  window.selectGameLevel = function (lvl) {
+    selectedLevel = Number(lvl) || 1;
+    for (let i = 1; i <= 4; i++) {
+      const btn = document.getElementById("btn-lvl-" + i);
+      if (btn) btn.classList.toggle("active", i === selectedLevel);
+    }
+    updateHud();
+    if (bannerEl) bannerEl.textContent = "Level " + selectedLevel + " dipilih. Klik Mulai Game untuk bermain.";
+  };
+
+  window.triggerFlinchEvent = function (penalty) {
+    const pen = typeof penalty === "number" ? penalty : 15;
+    flinchCount += 1;
+    composure = Math.max(0, composure - pen);
+    score = Math.max(0, score - pen * 2);
+    updateHud();
+    if (bannerEl) bannerEl.textContent = "FLINCH! Composure -" + pen + " (Total flinch: " + flinchCount + ")";
+    if (composure <= 0 && gameRunning) {
+      window.stopGameRound();
+    }
+  };
+
+  function cleanupRoundTimers() {
+    if (tickTimer) { clearInterval(tickTimer); tickTimer = null; }
+    if (promptTimer) { clearInterval(promptTimer); promptTimer = null; }
+  }
+
+  window.stopGameRound = function () {
+    if (!gameRunning && remainingSec === 0) return;
+    gameRunning = false;
+    cleanupRoundTimers();
+    const finalScore = Math.max(0, Math.round(score + composure * selectedLevel));
+    score = finalScore;
+    updateHud();
+    if (bannerEl) bannerEl.textContent = "Ronde selesai! Skor akhir: " + finalScore;
+    if (socket && socket.connected) {
+      socket.emit("report_score", {
+        level: selectedLevel,
+        score: finalScore,
+        blinks: flinchCount,
+        talks: 0,
+        rateSpikes: 0
+      });
+      setStatus("Skor (" + finalScore + ") dikirim ke server.", "#4ade80");
+    }
+  };
+
+  window.startSoloGame = function (overrideLevel, overrideDuration) {
+    if (overrideLevel) window.selectGameLevel(overrideLevel);
+    const durSelect = document.getElementById("game-duration");
+    const duration = Number(overrideDuration || (durSelect ? durSelect.value : 30)) || 30;
+
+    cleanupRoundTimers();
+    gameRunning = true;
+    composure = 100;
+    score = 0;
+    flinchCount = 0;
+    remainingSec = duration;
+    updateHud();
+
+    const prompts = LEVEL_PROMPTS[selectedLevel] || LEVEL_PROMPTS[1];
+    let pIdx = 0;
+    if (bannerEl) bannerEl.textContent = prompts[0];
+
+    const intervalMs = selectedLevel >= 3 ? 1600 : (selectedLevel === 2 ? 2200 : 3000);
+    promptTimer = setInterval(() => {
+      if (!gameRunning) return;
+      pIdx = (pIdx + 1) % prompts.length;
+      if (bannerEl) bannerEl.textContent = prompts[pIdx];
+      if (selectedLevel >= 2 && Math.random() < (0.2 * selectedLevel)) {
+        window.triggerFlinchEvent(5 * selectedLevel);
+      }
+    }, intervalMs);
+
+    tickTimer = setInterval(() => {
+      if (!gameRunning) return;
+      remainingSec -= 1;
+      score += 10 * selectedLevel;
+      updateHud();
+      if (remainingSec <= 0) {
+        window.stopGameRound();
+      }
+    }, 1000);
+  };
 
   window.enableLocalCamera = async function () {
     if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
@@ -34,16 +146,12 @@
       return;
     }
     try {
-      if (cameraStream) {
-        cameraStream.getTracks().forEach(t => t.stop());
-      }
+      if (cameraStream) cameraStream.getTracks().forEach(t => t.stop());
       cameraStream = await navigator.mediaDevices.getUserMedia({
         video: { facingMode: "user" },
         audio: false
       });
-      if (camVideoEl) {
-        camVideoEl.srcObject = cameraStream;
-      }
+      if (camVideoEl) camVideoEl.srcObject = cameraStream;
       if (camStatusEl) {
         camStatusEl.textContent = "Kamera aktif secara lokal (tidak dikirim ke server / tidak disimpan).";
         camStatusEl.style.color = "#4ade80";
@@ -61,9 +169,7 @@
       cameraStream.getTracks().forEach(t => t.stop());
       cameraStream = null;
     }
-    if (camVideoEl) {
-      camVideoEl.srcObject = null;
-    }
+    if (camVideoEl) camVideoEl.srcObject = null;
     if (camStatusEl) {
       camStatusEl.textContent = "Kamera lokal dimatikan.";
       camStatusEl.style.color = "#9ca3af";
@@ -108,7 +214,7 @@
 
     socket.on("connect", () => {
       setServerInfo("Terhubung ke: " + url + (serverIndex === 0 ? " (Primary Render)" : " (Backup Enzonic)"));
-      setStatus("Terhubung! Siap membuat atau bergabung ke room.", "#4ade80");
+      setStatus("Terhubung! Siap bermain atau masuk room.", "#4ade80");
       socket.emit("get_rooms");
     });
 
@@ -127,12 +233,21 @@
 
     socket.on("room_created", (data) => {
       myRole = "host";
-      setStatus("Room dibuat! Kode: " + (data && data.roomCode ? data.roomCode : "-"), "#4ade80");
+      currentRoomCode = (data && data.roomCode) || "";
+      const codeInput = document.getElementById("room-code");
+      if (codeInput && currentRoomCode) codeInput.value = currentRoomCode;
+      setStatus("Room dibuat! Kode: " + (currentRoomCode || "-"), "#4ade80");
     });
 
     socket.on("room_joined", (data) => {
       myRole = "guest";
       setStatus("Bergabung ke room " + (data && data.hostName ? data.hostName : "host"), "#4ade80");
+    });
+
+    socket.on("game_start", (payload) => {
+      const lvl = (payload && payload.level) || selectedLevel;
+      const dur = (payload && payload.duration) || 30;
+      window.startSoloGame(lvl, dur);
     });
 
     socket.on("game_result", (payload) => {
@@ -150,10 +265,7 @@
   window.createGameRoom = function () {
     const nameInput = document.getElementById("player-name");
     const hostName = (nameInput && nameInput.value.trim()) || "Player";
-    if (!socket || !socket.connected) {
-      connectWithFailover();
-      return;
-    }
+    if (!socket || !socket.connected) { connectWithFailover(); return; }
     socket.emit("create_room", { hostName });
   };
 
@@ -168,20 +280,24 @@
     const codeInput = document.getElementById("room-code");
     const playerName = (nameInput && nameInput.value.trim()) || "Player";
     const roomCode = (codeInput && codeInput.value.trim().toUpperCase()) || "";
-    if (!roomCode) {
-      setStatus("Masukkan kode room terlebih dahulu.", "#fbbf24");
-      return;
-    }
-    if (!socket || !socket.connected) {
-      connectWithFailover();
-      return;
-    }
+    if (!roomCode) { setStatus("Masukkan kode room terlebih dahulu.", "#fbbf24"); return; }
+    if (!socket || !socket.connected) { connectWithFailover(); return; }
+    currentRoomCode = roomCode;
     socket.emit("join_room", { roomCode, name: playerName });
+  };
+
+  window.startMultiplayerFromHost = function () {
+    const codeInput = document.getElementById("room-code");
+    const code = (codeInput && codeInput.value.trim().toUpperCase()) || currentRoomCode;
+    if (socket && socket.connected && code) {
+      socket.emit("start_game", { code, level: selectedLevel });
+    }
+    window.startSoloGame(selectedLevel);
   };
 
   window.sendTestScore = function () {
     if (!socket || !socket.connected) return;
-    socket.emit("report_score", { score: 100, blinks: 0, talks: 0, rateSpikes: 0 });
+    socket.emit("report_score", { level: selectedLevel, score: 100, blinks: 0, talks: 0, rateSpikes: 0 });
     setStatus("Skor uji coba (100) dikirim.", "#4ade80");
   };
 
@@ -189,7 +305,13 @@
     if (socket && socket.connected) {
       socket.emit("visibility_change", document.hidden);
     }
+    if (document.hidden && gameRunning) {
+      window.triggerFlinchEvent(10);
+    }
   });
 
-  window.addEventListener("DOMContentLoaded", connectWithFailover);
+  window.addEventListener("DOMContentLoaded", () => {
+    updateHud();
+    connectWithFailover();
+  });
 })();

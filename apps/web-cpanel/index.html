@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="id">
+<html lang="en">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -28,24 +28,24 @@
 <body>
   <div class="box">
     <h1>Presage Party Web Client</h1>
-    <div class="muted" id="mp-server-info">Menyiapkan koneksi server...</div>
-    <div id="mp-status" style="font-weight:600;margin-bottom:14px;">Inisialisasi...</div>
+    <div class="muted" id="mp-server-info">Preparing server connection...</div>
+    <div id="mp-status" style="font-weight:600;margin-bottom:14px;">Initializing...</div>
 
     <div class="row">
-      <input id="player-name" type="text" placeholder="Nama pemain" value="Player" />
+      <input id="player-name" type="text" placeholder="Player name" value="Player" />
       <button type="button" onclick="window.createGameRoom()">Create Room</button>
       <button type="button" class="secondary" onclick="window.refreshRooms()">Refresh Rooms</button>
       <button type="button" class="secondary" onclick="window.startMultiplayerFromHost()">Host Start Game</button>
     </div>
 
     <div class="row">
-      <input id="room-code" type="text" placeholder="Kode Room" maxlength="8" style="text-transform:uppercase;width:140px;" />
+      <input id="room-code" type="text" placeholder="Room Code" maxlength="8" style="text-transform:uppercase;width:140px;" />
       <button type="button" onclick="window.joinGameRoom()">Join Room</button>
       <button type="button" class="secondary" onclick="window.sendTestScore()">Test Score (100)</button>
     </div>
 
     <div class="panel">
-      <strong>Pilih Level Game (Mode Tersedia)</strong>
+      <strong>Select Game Level</strong>
       <div class="row" style="margin-top:10px;">
         <button type="button" id="btn-lvl-1" class="lvl active" onclick="window.selectGameLevel(1)">Level 1 — Calm Focus</button>
         <button type="button" id="btn-lvl-2" class="lvl" onclick="window.selectGameLevel(2)">Level 2 — Distraction</button>
@@ -53,39 +53,39 @@
         <button type="button" id="btn-lvl-4" class="lvl" onclick="window.selectGameLevel(4)">Level 4 — Flinch Royale</button>
       </div>
       <div class="row">
-        <label for="game-duration" class="muted" style="margin:0;">Durasi:</label>
+        <label for="game-duration" class="muted" style="margin:0;">Duration:</label>
         <select id="game-duration">
-          <option value="15">15 Detik (Cepat)</option>
-          <option value="30" selected>30 Detik (Standar)</option>
-          <option value="60">60 Detik (Marathon)</option>
+          <option value="15">15 Seconds (Quick)</option>
+          <option value="30" selected>30 Seconds (Standard)</option>
+          <option value="60">60 Seconds (Marathon)</option>
         </select>
-        <button type="button" onclick="window.startSoloGame()">Mulai Game</button>
-        <button type="button" class="danger" onclick="window.stopGameRound()">Stop &amp; Kirim Skor</button>
-        <button type="button" class="secondary" onclick="window.triggerFlinchEvent()">Simulasi Flinch (-15)</button>
+        <button type="button" onclick="window.startSoloGame()">Start Game</button>
+        <button type="button" class="danger" onclick="window.stopGameRound()">Stop &amp; Submit Score</button>
+        <button type="button" class="secondary" onclick="window.triggerFlinchEvent()">Simulate Flinch (-15)</button>
       </div>
 
       <div class="hud">
         <div class="stat"><div class="muted" style="margin:0;">Level</div><div class="stat-val" id="hud-level">1</div></div>
-        <div class="stat"><div class="muted" style="margin:0;">Sisa Waktu</div><div class="stat-val" id="hud-time">0s</div></div>
+        <div class="stat"><div class="muted" style="margin:0;">Time Left</div><div class="stat-val" id="hud-time">0s</div></div>
         <div class="stat"><div class="muted" style="margin:0;">Composure</div><div class="stat-val" id="hud-composure">100</div></div>
-        <div class="stat"><div class="muted" style="margin:0;">Skor</div><div class="stat-val" id="hud-score">0</div></div>
+        <div class="stat"><div class="muted" style="margin:0;">Score</div><div class="stat-val" id="hud-score">0</div></div>
       </div>
 
-      <div id="distraction-banner">Siap bermain. Pilih Level lalu klik Mulai Game.</div>
+      <div id="distraction-banner">Ready to play. Select a level and click Start Game.</div>
     </div>
 
     <div class="panel">
-      <strong>Daftar Room Aktif</strong>
-      <div id="room-list" style="margin-top:8px;">Memuat room...</div>
+      <strong>Active Rooms</strong>
+      <div id="room-list" style="margin-top:8px;">Loading rooms...</div>
     </div>
 
     <div class="panel">
-      <strong>Kamera Lokal Browser (Opsional — Tanpa Kirim Frame / Simpan Biometrik)</strong>
+      <strong>Local Browser Camera (Optional — No Frame Upload / No Biometric Storage)</strong>
       <div class="row" style="margin-top:10px;">
-        <button type="button" class="secondary" onclick="window.enableLocalCamera()">Aktifkan Kamera Lokal</button>
-        <button type="button" class="secondary" onclick="window.disableLocalCamera()">Matikan Kamera</button>
+        <button type="button" class="secondary" onclick="window.enableLocalCamera()">Enable Local Camera</button>
+        <button type="button" class="secondary" onclick="window.disableLocalCamera()">Disable Camera</button>
       </div>
-      <div id="cam-status" class="muted" style="margin-bottom:6px;">Kamera belum diaktifkan.</div>
+      <div id="cam-status" class="muted" style="margin-bottom:6px;">Local camera is off.</div>
       <video id="local-cam-preview" autoplay playsinline muted></video>
     </div>
   </div>

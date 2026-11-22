@@ -5,10 +5,10 @@
   ];
 
   const LEVEL_PROMPTS = {
-    1: ["Tetap tenang...", "Jangan berkedip terlalu sering!", "Jaga fokus Anda."],
-    2: ["FLASH DISTRACTION!", "Suara & visual muncul tiba-tiba!", "Pertahankan composure!"],
-    3: ["CHAOS RUSH!", "Kecepatan distraksi meningkat!", "Tetap stabil!"],
-    4: ["FLINCH ROYALE!", "Mode intensitas maksimal!", "Jangan lengah sedikit pun!"]
+    1: ["Stay calm...", "Keep your eyes steady!", "Hold your focus."],
+    2: ["FLASH DISTRACTION!", "Sudden visual & audio triggers!", "Keep your composure!"],
+    3: ["CHAOS RUSH!", "Distraction pace increasing!", "Stay steady!"],
+    4: ["FLINCH ROYALE!", "Maximum intensity mode!", "Do not flinch!"]
   };
 
   let socket = null;
@@ -62,7 +62,7 @@
       if (btn) btn.classList.toggle("active", i === selectedLevel);
     }
     updateHud();
-    if (bannerEl) bannerEl.textContent = "Level " + selectedLevel + " dipilih. Klik Mulai Game untuk bermain.";
+    if (bannerEl) bannerEl.textContent = "Level " + selectedLevel + " selected. Click Start Game to begin.";
   };
 
   window.triggerFlinchEvent = function (penalty) {
@@ -71,7 +71,7 @@
     composure = Math.max(0, composure - pen);
     score = Math.max(0, score - pen * 2);
     updateHud();
-    if (bannerEl) bannerEl.textContent = "FLINCH! Composure -" + pen + " (Total flinch: " + flinchCount + ")";
+    if (bannerEl) bannerEl.textContent = "FLINCH! Composure -" + pen + " (Total flinches: " + flinchCount + ")";
     if (composure <= 0 && gameRunning) {
       window.stopGameRound();
     }
@@ -89,7 +89,7 @@
     const finalScore = Math.max(0, Math.round(score + composure * selectedLevel));
     score = finalScore;
     updateHud();
-    if (bannerEl) bannerEl.textContent = "Ronde selesai! Skor akhir: " + finalScore;
+    if (bannerEl) bannerEl.textContent = "Round finished! Final score: " + finalScore;
     if (socket && socket.connected) {
       socket.emit("report_score", {
         level: selectedLevel,
@@ -98,7 +98,7 @@
         talks: 0,
         rateSpikes: 0
       });
-      setStatus("Skor (" + finalScore + ") dikirim ke server.", "#4ade80");
+      setStatus("Score (" + finalScore + ") submitted to server.", "#4ade80");
     }
   };
 
@@ -142,7 +142,7 @@
 
   window.enableLocalCamera = async function () {
     if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-      if (camStatusEl) camStatusEl.textContent = "Browser tidak mendukung kamera (getUserMedia).";
+      if (camStatusEl) camStatusEl.textContent = "Browser does not support camera (getUserMedia).";
       return;
     }
     try {
@@ -153,12 +153,12 @@
       });
       if (camVideoEl) camVideoEl.srcObject = cameraStream;
       if (camStatusEl) {
-        camStatusEl.textContent = "Kamera aktif secara lokal (tidak dikirim ke server / tidak disimpan).";
+        camStatusEl.textContent = "Local camera active (no frames uploaded / no biometric data stored).";
         camStatusEl.style.color = "#4ade80";
       }
     } catch (err) {
       if (camStatusEl) {
-        camStatusEl.textContent = "Izin kamera ditolak / tidak tersedia: " + (err && err.message ? err.message : err);
+        camStatusEl.textContent = "Camera permission denied or unavailable: " + (err && err.message ? err.message : err);
         camStatusEl.style.color = "#f87171";
       }
     }
@@ -171,7 +171,7 @@
     }
     if (camVideoEl) camVideoEl.srcObject = null;
     if (camStatusEl) {
-      camStatusEl.textContent = "Kamera lokal dimatikan.";
+      camStatusEl.textContent = "Local camera disabled.";
       camStatusEl.style.color = "#9ca3af";
     }
   };
@@ -179,7 +179,7 @@
   function renderRooms(rooms) {
     if (!roomListEl) return;
     if (!Array.isArray(rooms) || rooms.length === 0) {
-      roomListEl.innerHTML = '<div style="color:#9ca3af;font-size:13px;">Belum ada room aktif.</div>';
+      roomListEl.innerHTML = '<div style="color:#9ca3af;font-size:13px;">No active rooms available.</div>';
       return;
     }
     roomListEl.innerHTML = rooms.map(r => {
@@ -193,12 +193,12 @@
 
   function connectWithFailover() {
     if (typeof window.io !== "function") {
-      setStatus("Socket.IO client tidak dimuat.", "#f87171");
+      setStatus("Socket.IO client not loaded.", "#f87171");
       return;
     }
     const url = SERVER_URLS[serverIndex];
-    setServerInfo("Menghubungkan ke: " + url);
-    setStatus("Menyambungkan ke server...", "#fbbf24");
+    setServerInfo("Connecting to: " + url);
+    setStatus("Connecting to server...", "#fbbf24");
 
     if (socket) {
       socket.removeAllListeners();
@@ -213,8 +213,8 @@
     });
 
     socket.on("connect", () => {
-      setServerInfo("Terhubung ke: " + url + (serverIndex === 0 ? " (Primary Render)" : " (Backup Enzonic)"));
-      setStatus("Terhubung! Siap bermain atau masuk room.", "#4ade80");
+      setServerInfo("Connected to: " + url + (serverIndex === 0 ? " (Primary Render)" : " (Backup Enzonic)"));
+      setStatus("Connected! Ready to play or join a room.", "#4ade80");
       socket.emit("get_rooms");
     });
 
@@ -222,10 +222,10 @@
       const nextIndex = serverIndex + 1;
       if (nextIndex < SERVER_URLS.length) {
         serverIndex = nextIndex;
-        setStatus("Server utama lambat/gagal, beralih ke cadangan...", "#fbbf24");
+        setStatus("Primary server unreachable, switching to backup...", "#fbbf24");
         connectWithFailover();
       } else {
-        setStatus("Gagal terhubung ke server Render & Enzonic: " + (err && err.message ? err.message : err), "#f87171");
+        setStatus("Failed to connect to Render & Enzonic: " + (err && err.message ? err.message : err), "#f87171");
       }
     });
 
@@ -236,12 +236,12 @@
       currentRoomCode = (data && data.roomCode) || "";
       const codeInput = document.getElementById("room-code");
       if (codeInput && currentRoomCode) codeInput.value = currentRoomCode;
-      setStatus("Room dibuat! Kode: " + (currentRoomCode || "-"), "#4ade80");
+      setStatus("Room created! Code: " + (currentRoomCode || "-"), "#4ade80");
     });
 
     socket.on("room_joined", (data) => {
       myRole = "guest";
-      setStatus("Bergabung ke room " + (data && data.hostName ? data.hostName : "host"), "#4ade80");
+      setStatus("Joined " + (data && data.hostName ? data.hostName : "host") + "'s room", "#4ade80");
     });
 
     socket.on("game_start", (payload) => {
@@ -253,7 +253,7 @@
     socket.on("game_result", (payload) => {
       const mine = myRole === "host" ? payload.host : payload.guest;
       const opp = myRole === "host" ? payload.guest : payload.host;
-      setStatus("Hasil — Skor Anda: " + (mine ? mine.score : 0) + " | Lawan: " + (opp ? opp.score : 0), "#60a5fa");
+      setStatus("Result — Your Score: " + (mine ? mine.score : 0) + " | Opponent: " + (opp ? opp.score : 0), "#60a5fa");
     });
   }
 
@@ -280,7 +280,7 @@
     const codeInput = document.getElementById("room-code");
     const playerName = (nameInput && nameInput.value.trim()) || "Player";
     const roomCode = (codeInput && codeInput.value.trim().toUpperCase()) || "";
-    if (!roomCode) { setStatus("Masukkan kode room terlebih dahulu.", "#fbbf24"); return; }
+    if (!roomCode) { setStatus("Please enter a room code first.", "#fbbf24"); return; }
     if (!socket || !socket.connected) { connectWithFailover(); return; }
     currentRoomCode = roomCode;
     socket.emit("join_room", { roomCode, name: playerName });
@@ -298,7 +298,7 @@
   window.sendTestScore = function () {
     if (!socket || !socket.connected) return;
     socket.emit("report_score", { level: selectedLevel, score: 100, blinks: 0, talks: 0, rateSpikes: 0 });
-    setStatus("Skor uji coba (100) dikirim.", "#4ade80");
+    setStatus("Test score (100) sent.", "#4ade80");
   };
 
   document.addEventListener("visibilitychange", () => {

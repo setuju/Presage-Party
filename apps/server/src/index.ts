@@ -4,7 +4,25 @@ import { Server } from 'socket.io';
 
 const app = express();
 const httpServer = createServer(app);
-const io = new Server(httpServer, { cors: { origin: '*', methods: ['GET', 'POST'] } });
+import crypto from 'crypto';
+import rateLimit from 'express-rate-limit';
+
+// Restrict CORS to the known frontend origin
+const io = new Server(httpServer, { cors: { origin: 'https://finchgame.saturumah.net', methods: ['GET', 'POST'] } });
+
+// Apply simple rate limiting to HTTP endpoints (10 req/min per IP)
+// Add CSP header for all responses
+app.use((req, res, next) => {
+  res.setHeader('Content-Security-Policy', "default-src 'self'; script-src 'self' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline'; img-src 'self' data:");
+  next();
+});
+
+  windowMs: 60 * 1000,
+  max: 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+}));
+
 
 app.get('/', (req, res) => res.send('Presage Party Server is running.'));
 
@@ -44,7 +62,8 @@ io.on('connection', (socket) => {
         return;
       }
 
-      const code = Math.random().toString(36).substring(2, 6).toUpperCase();
+      const crypto = require('crypto');
+const code = crypto.randomBytes(3).toString('hex').toUpperCase();
       const pwd = data && data.password ? data.password.trim() : null;
       const hostName = (data && data.name) ? data.name.trim() : 'Room Master';
       

@@ -157,7 +157,19 @@
   const telTalkEl = document.getElementById("tel-talk");
 
   // Web Audio Synthesizer (for distraction and scare cues)
-  function getAudioContext() {
+  // Simple HTML escape to prevent XSS
+function escapeHTML(str) {
+  return String(str).replace(/[&<>"']/g, function (c) {
+    return {
+      '&': '&amp;',
+      '<': '&lt;',
+      '>': '&gt;',
+      '"': '&quot;',
+      "'": '&#39;'
+    }[c];
+  });
+}
+
     if (!audioCtx) {
       const AudioCtx = window.AudioContext || window.webkitAudioContext;
       if (AudioCtx) audioCtx = new AudioCtx();
@@ -597,10 +609,17 @@
     const list = Array.isArray(rooms) ? rooms : [];
     if (roomCountEl) roomCountEl.textContent = list.length + " active";
     if (list.length === 0) {
-      roomListEl.innerHTML = '<div class="muted">No active rooms available. Create one as Room Master.</div>';
+      roomListEl.innerHTML = '<div class="muted">No active rooms available. Create one as Room Master.</div>';;
       return;
     }
     roomListEl.innerHTML = list.map(r => {
+        const code = escapeHTML(r.code || r.roomCode || "");
+        const hostName = escapeHTML(r.host || r.hostName || "Room Master");
+        return `<div class="room-item">
+          <div><strong>${code}</strong> <span class="muted">· Host: ${hostName}</span></div>
+          <button type="button" class="btn btn-m2" onclick="window.joinWithCode('${code}')">Join</button>
+        </div>`;
+      }).join("");
       const code = r.code || r.roomCode || "";
       const hostName = r.host || r.hostName || "Room Master";
       return '<div class="room-item">' +

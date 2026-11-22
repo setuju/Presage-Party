@@ -247,13 +247,22 @@ document.addEventListener('DOMContentLoaded', () => {
 
   async function loadData() {
     if (!timeline) {
-      const res = await window.presage.getTimeline();
-      if (res && res.error) { alert('Timeline error: ' + res.error); return false; }
-      timeline = res;
+      if (window.presage && typeof window.presage.getTimeline === "function") {
+        const res = await window.presage.getTimeline();
+        if (res && res.error) { alert("Timeline error: " + res.error); return false; }
+        timeline = res;
+      } else {
+        timeline = { rates: [] };
+      }
     }
     if (!videoUrl) {
-      videoUrl = await window.presage.getVideoUrl();
-      bgVideo.src = videoUrl; video.src = videoUrl;
+      if (window.presage && typeof window.presage.getVideoUrl === "function") {
+        videoUrl = await window.presage.getVideoUrl();
+        if (bgVideo) bgVideo.src = videoUrl;
+        if (video) video.src = videoUrl;
+      } else {
+        await initOptionalBrowserCamera();
+      }
     }
     return true;
   }
@@ -448,6 +457,14 @@ document.addEventListener('DOMContentLoaded', () => {
     // Segarkan status aset setiap kali masuk ke menu multiplayer
     (async () => {
       try {
+        if (!window.presage || typeof window.presage.checkAssets !== "function") {
+          assetsReady = false;
+          if (typeof assetStatus !== "undefined" && assetStatus) {
+            assetStatus.textContent = "Web mode: local video assets not required.";
+            assetStatus.style.color = "#93c5fd";
+          }
+          return;
+        }
         const res = await window.presage.checkAssets();
         assetsReady = res.ready;
         if (res.ready) {
@@ -460,10 +477,114 @@ document.addEventListener('DOMContentLoaded', () => {
       } catch(e) {}
     })();
 
-    socket = io('http://127.0.0.1:3000', { transports: ['websocket', 'polling'], timeout: 5000, reconnectionAttempts: 3 });
-    
-    socket.on('connect', () => {
-      if(mpServerInfo) mpServerInfo.textContent = 'Connected to 127.0.0.1:3000';
+      const PRESAGE_SERVER_URLS = [
+    "https://presage-party.onrender.com",
+    "https://presage-party.enzonic.dev"
+  ];
+  let presageSdk = null;
+  let webCameraStream = null;
+
+  async function initOptionalBrowserCamera() {
+    if (window.presage && typeof window.presage.getVideoUrl === "function") return null;
+    if (webCameraStream) return webCameraStream;
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) return null;
+    try {
+      webCameraStream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: "user" },
+        audio: false
+      });
+      if (typeof bgVideo !== "undefined" && bgVideo) {
+        bgVideo.srcObject = webCameraStream;
+        bgVideo.play().catch(() => {});
+      }
+      return webCameraStream;
+    } catch (err) {
+      console.warn("[web-camera] Camera unavailable or permission denied:", err && err.message ? err.message : err);
+      return null;
+    }
+  }
+
+  function createPresageSocketClient() {
+    const SDKClass =
+      typeof PresageSocketSDK === "function"
+        ? PresageSocketSDK
+        : (typeof window !== "undefined" && typeof window.PresageSocketSDK === "function"
+            ? window.PresageSocketSDK
+            : null);
+
+    if (SDKClass) {
+      presageSdk = new SDKClass({
+        serverUrls: PRESAGE_SERVER_URLS,
+        targetFps: 6,
+        connectTimeoutMs: 4000
+      });
+      return {
+        get id() { return presageSdk.socket ? presageSdk.socket.id : undefined; },
+        get connected() { return Boolean(presageSdk.socket && presageSdk.socket.connected); },
+        on(ev, fn) { presageSdk.on(ev, fn); },
+        emit(ev, payload, cb) {
+          if (ev === "get_rooms") return presageSdk.getRooms();
+          if (ev === "create_room") return presageSdk.createRoom(payload && payload.hostName, payload && payload.roomCode);
+          if (ev === "join_room") return presageSdk.joinRoom(payload || {}, cb);
+          if (ev === "start_game") return presageSdk.startGame(payload && payload.code, cb);
+          if (ev === "report_score") return presageSdk.reportScore(payload || { score: 0 }, cb);
+          if (ev === "visibility_change") return presageSdk.sendVisibilityChange(Boolean(payload));
+          if (presageSdk.socket) presageSdk.socket.emit(ev, payload, cb);
+        },
+        getActiveUrl() { return presageSdk.getActiveServerUrl(); }
+      };
+    }
+
+    let idx = 0;
+    let activeSocket = null;
+    const queuedListeners = [];
+
+    const connectUrl = () => {
+      const url = PRESAGE_SERVER_URLS[idx];
+      if (activeSocket) {
+        activeSocket.removeAllListeners();
+        activeSocket.disconnect();
+      }
+      activeSocket = io(url, {
+        transports: ["websocket", "polling"],
+        timeout: 4500,
+        reconnection: true,
+        reconnectionAttempts: 2
+      });
+      for (const item of queuedListeners) {
+        activeSocket.on(item.ev, item.fn);
+      }
+      activeSocket.on("connect_error", () => {
+        if (idx + 1 < PRESAGE_SERVER_URLS.length) {
+          idx += 1;
+          connectUrl();
+        }
+      });
+    };
+
+    connectUrl();
+
+    return {
+      get id() { return activeSocket ? activeSocket.id : undefined; },
+      get connected() { return Boolean(activeSocket && activeSocket.connected); },
+      on(ev, fn) {
+        queuedListeners.push({ ev, fn });
+        if (activeSocket) activeSocket.on(ev, fn);
+      },
+      emit(ev, payload, cb) {
+        if (!activeSocket) return;
+        if (payload !== undefined && cb !== undefined) activeSocket.emit(ev, payload, cb);
+        else if (payload !== undefined) activeSocket.emit(ev, payload);
+        else activeSocket.emit(ev);
+      },
+      getActiveUrl() { return PRESAGE_SERVER_URLS[idx]; }
+    };
+  }
+    socket = createPresageSocketClient();
+
+    socket.on("connect", () => {
+      const activeServer = typeof socket.getActiveUrl === "function" ? socket.getActiveUrl() : PRESAGE_SERVER_URLS[0];
+      if (mpServerInfo) mpServerInfo.textContent = "Connected to " + activeServer;
       mpStatus.textContent = 'Connected!'; mpStatus.style.color = '#4ade80';
       btnCreateRoom.disabled = false; btnJoinRoom.disabled = false;
       if (assetsReady) socket.emit('assets_ready');
@@ -584,6 +705,14 @@ document.addEventListener('DOMContentLoaded', () => {
           console.warn('[init] presage.checkAssets unavailable - skipping asset check');
           assetStatus.textContent = 'Asset check unavailable (preload missing). Level 3 disabled.';
           assetStatus.style.color = '#fbbf24';
+          return;
+        }
+        if (!window.presage || typeof window.presage.checkAssets !== "function") {
+          assetsReady = false;
+          if (typeof assetStatus !== "undefined" && assetStatus) {
+            assetStatus.textContent = "Web mode: local video assets not required.";
+            assetStatus.style.color = "#93c5fd";
+          }
           return;
         }
         const res = await window.presage.checkAssets();

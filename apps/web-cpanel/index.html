@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Presage Party — Web Lobby (finchgame.saturumah.net)</title>
+  <style>
+    body { font-family: system-ui, -apple-system, sans-serif; background: #0b0d12; color: #f3f4f6; margin: 0; padding: 24px; }
+    .box { max-width: 760px; margin: 0 auto; background: #141821; border: 1px solid #262d3d; border-radius: 12px; padding: 24px; }
+    h1 { margin: 0 0 8px; font-size: 24px; }
+    .muted { color: #9ca3af; font-size: 13px; margin-bottom: 18px; }
+    .row { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 14px; }
+    input { background: #0b0d12; border: 1px solid #2d3548; color: #fff; padding: 10px 12px; border-radius: 8px; font-size: 14px; }
+    button { background: #2563eb; color: #fff; border: none; padding: 10px 16px; border-radius: 8px; font-weight: 600; cursor: pointer; }
+    button.secondary { background: #1f2937; border: 1px solid #374151; }
+    .panel { background: #0b0d12; border: 1px solid #222938; border-radius: 10px; padding: 14px; margin-top: 14px; }
+    video { width: 100%; max-height: 260px; background: #000; border-radius: 8px; margin-top: 10px; }
+  </style>
+</head>
+<body>
+  <div class="box">
+    <h1>Presage Party Web Client</h1>
+    <div class="muted" id="mp-server-info">Menyiapkan koneksi server...</div>
+    <div id="mp-status" style="font-weight:600;margin-bottom:16px;">Inisialisasi...</div>
+
+    <div class="row">
+      <input id="player-name" type="text" placeholder="Nama pemain" value="Player" />
+      <button type="button" onclick="window.createGameRoom()">Create Room</button>
+      <button type="button" class="secondary" onclick="window.refreshRooms()">Refresh Rooms</button>
+    </div>
+
+    <div class="row">
+      <input id="room-code" type="text" placeholder="Kode Room (mis. ABCD)" maxlength="8" style="text-transform:uppercase;" />
+      <button type="button" onclick="window.joinGameRoom()">Join Room</button>
+      <button type="button" class="secondary" onclick="window.sendTestScore()">Test Score</button>
+    </div>
+
+    <div class="panel">
+      <strong>Daftar Room Aktif</strong>
+      <div id="room-list" style="margin-top:8px;">Memuat room...</div>
+    </div>
+
+    <div class="panel">
+      <strong>Kamera Lokal Browser (Opsional — Tanpa Kirim Frame / Simpan Biometrik)</strong>
+      <div class="row" style="margin-top:10px;">
+        <button type="button" class="secondary" onclick="window.enableLocalCamera()">Aktifkan Kamera Lokal</button>
+        <button type="button" class="secondary" onclick="window.disableLocalCamera()">Matikan Kamera</button>
+      </div>
+      <div id="cam-status" class="muted" style="margin-bottom:6px;">Kamera belum diaktifkan.</div>
+      <video id="local-cam-preview" autoplay playsinline muted></video>
+    </div>
+  </div>
+
+  <script src="./socket.io.min.js"></script>
+  <script src="./web-client.js"></script>
+</body>
+</html>

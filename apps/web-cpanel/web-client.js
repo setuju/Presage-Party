@@ -5,10 +5,10 @@
   ];
 
   const LEVEL_PROMPTS = {
-    1: ["Stay calm...", "Keep your eyes steady!", "Hold your focus."],
-    2: ["FLASH DISTRACTION!", "Sudden visual & audio triggers!", "Keep your composure!"],
-    3: ["CHAOS RUSH!", "Distraction pace increasing!", "Stay steady!"],
-    4: ["FLINCH ROYALE!", "Maximum intensity mode!", "Do not flinch!"]
+    1: ["Stay calm — tap the green FOCUS orb!", "Steady hands, steady eyes.", "Keep your composure above 0."],
+    2: ["FLASH DISTRACTION! Tap FOCUS before decoy fades!", "Sudden alerts incoming — stay calm!", "Do not lose focus!"],
+    3: ["CHAOS RUSH! Fast decoys & alerts!", "High speed — tap FOCUS accurately!", "Hold your nerve!"],
+    4: ["FLINCH ROYALE! Maximum pressure!", "Rapid distractions — zero flinching!", "Survive until timer hits 0!"]
   };
 
   let socket = null;
@@ -36,6 +36,8 @@
   const hudComposureEl = document.getElementById("hud-composure");
   const hudScoreEl = document.getElementById("hud-score");
   const bannerEl = document.getElementById("distraction-banner");
+  const arenaEl = document.getElementById("game-arena");
+  const orbEl = document.getElementById("focus-orb");
 
   function setStatus(msg, color) {
     if (statusEl) {
@@ -55,6 +57,54 @@
     if (hudScoreEl) hudScoreEl.textContent = String(Math.max(0, Math.round(score)));
   }
 
+  function clearDecoys() {
+    if (!arenaEl) return;
+    arenaEl.querySelectorAll(".hazard-decoy").forEach(el => el.remove());
+    arenaEl.classList.remove("flash-alert");
+  }
+
+  function moveFocusOrb() {
+    if (!arenaEl || !orbEl) return;
+    const maxX = Math.max(50, arenaEl.clientWidth - 84);
+    const maxY = Math.max(50, arenaEl.clientHeight - 84);
+    const x = 18 + Math.random() * (maxX - 18);
+    const y = 18 + Math.random() * (maxY - 18);
+    orbEl.style.left = x + "px";
+    orbEl.style.top = y + "px";
+    orbEl.style.transform = "none";
+  }
+
+  function spawnDistractionDecoy() {
+    if (!arenaEl || !gameRunning) return;
+    const decoy = document.createElement("div");
+    decoy.className = "hazard-decoy";
+    const labels = ["BOO!", "FLASH!", "FLINCH!", "ALERT!"];
+    decoy.textContent = labels[Math.floor(Math.random() * labels.length)];
+    const maxX = Math.max(40, arenaEl.clientWidth - 95);
+    const maxY = Math.max(40, arenaEl.clientHeight - 40);
+    decoy.style.left = (10 + Math.random() * maxX) + "px";
+    decoy.style.top = (10 + Math.random() * maxY) + "px";
+    arenaEl.appendChild(decoy);
+    arenaEl.classList.add("flash-alert");
+    setTimeout(() => {
+      decoy.remove();
+      if (arenaEl && arenaEl.querySelectorAll(".hazard-decoy").length === 0) {
+        arenaEl.classList.remove("flash-alert");
+      }
+    }, 950);
+  }
+
+  window.tapFocusOrb = function () {
+    if (!gameRunning) {
+      if (bannerEl) bannerEl.textContent = "Click Start Game first to begin the round!";
+      return;
+    }
+    score += 25 * selectedLevel;
+    composure = Math.min(100, composure + 2);
+    moveFocusOrb();
+    updateHud();
+  };
+
   window.selectGameLevel = function (lvl) {
     selectedLevel = Number(lvl) || 1;
     for (let i = 1; i <= 4; i++) {
@@ -70,6 +120,7 @@
     flinchCount += 1;
     composure = Math.max(0, composure - pen);
     score = Math.max(0, score - pen * 2);
+    spawnDistractionDecoy();
     updateHud();
     if (bannerEl) bannerEl.textContent = "FLINCH! Composure -" + pen + " (Total flinches: " + flinchCount + ")";
     if (composure <= 0 && gameRunning) {
@@ -80,6 +131,7 @@
   function cleanupRoundTimers() {
     if (tickTimer) { clearInterval(tickTimer); tickTimer = null; }
     if (promptTimer) { clearInterval(promptTimer); promptTimer = null; }
+    clearDecoys();
   }
 
   window.stopGameRound = function () {
@@ -99,6 +151,8 @@
         rateSpikes: 0
       });
       setStatus("Score (" + finalScore + ") submitted to server.", "#4ade80");
+    } else {
+      setStatus("Round finished! Final score: " + finalScore + " (offline/reconnecting)", "#fbbf24");
     }
   };
 
@@ -113,17 +167,23 @@
     score = 0;
     flinchCount = 0;
     remainingSec = duration;
+    moveFocusOrb();
     updateHud();
 
     const prompts = LEVEL_PROMPTS[selectedLevel] || LEVEL_PROMPTS[1];
     let pIdx = 0;
-    if (bannerEl) bannerEl.textContent = prompts[0];
+    if (bannerEl) bannerEl.textContent = "LIVE — " + prompts[0];
+    setStatus("Game running on Level " + selectedLevel + " (" + duration + "s)!", "#4ade80");
 
-    const intervalMs = selectedLevel >= 3 ? 1600 : (selectedLevel === 2 ? 2200 : 3000);
+    const intervalMs = selectedLevel >= 3 ? 1400 : (selectedLevel === 2 ? 2000 : 2600);
     promptTimer = setInterval(() => {
       if (!gameRunning) return;
       pIdx = (pIdx + 1) % prompts.length;
-      if (bannerEl) bannerEl.textContent = prompts[pIdx];
+      if (bannerEl) bannerEl.textContent = "LIVE — " + prompts[pIdx];
+      moveFocusOrb();
+      if (selectedLevel >= 2) {
+        spawnDistractionDecoy();
+      }
       if (selectedLevel >= 2 && Math.random() < (0.2 * selectedLevel)) {
         window.triggerFlinchEvent(5 * selectedLevel);
       }
@@ -140,25 +200,53 @@
     }, 1000);
   };
 
+  async function requestCameraWithFallback() {
+    const attempts = [
+      { video: { facingMode: { ideal: "user" } }, audio: false },
+      { video: { facingMode: "user" }, audio: false },
+      { video: true, audio: false }
+    ];
+    let lastErr = null;
+    for (const constraints of attempts) {
+      try {
+        return await navigator.mediaDevices.getUserMedia(constraints);
+      } catch (err) {
+        lastErr = err;
+        if (err && (err.name === "NotAllowedError" || err.name === "PermissionDeniedError")) {
+          throw err;
+        }
+      }
+    }
+    throw lastErr || new Error("Unable to access camera");
+  }
+
   window.enableLocalCamera = async function () {
     if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-      if (camStatusEl) camStatusEl.textContent = "Browser does not support camera (getUserMedia).";
+      if (camStatusEl) {
+        camStatusEl.textContent = "Browser does not support camera (getUserMedia). Game still works without camera.";
+        camStatusEl.style.color = "#fbbf24";
+      }
       return;
     }
     try {
       if (cameraStream) cameraStream.getTracks().forEach(t => t.stop());
-      cameraStream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: "user" },
-        audio: false
-      });
+      if (camStatusEl) {
+        camStatusEl.textContent = "Requesting camera permission...";
+        camStatusEl.style.color = "#fbbf24";
+      }
+      cameraStream = await requestCameraWithFallback();
       if (camVideoEl) camVideoEl.srcObject = cameraStream;
       if (camStatusEl) {
         camStatusEl.textContent = "Local camera active (no frames uploaded / no biometric data stored).";
         camStatusEl.style.color = "#4ade80";
       }
     } catch (err) {
+      const errName = (err && err.name) || "Error";
+      const hint = (errName === "NotAllowedError" || errName === "PermissionDeniedError")
+        ? "Allow Camera in Android Settings -> Apps -> Chrome -> Permissions, and in Chrome site settings for finchgame.saturumah.net. (Game runs fine without camera.)"
+        : ((err && err.message) || String(err));
       if (camStatusEl) {
-        camStatusEl.textContent = "Camera permission denied or unavailable: " + (err && err.message ? err.message : err);
+        camStatusEl.textContent = "Camera permission denied (" + errName + "): " + hint;
         camStatusEl.style.color = "#f87171";
       }
     }

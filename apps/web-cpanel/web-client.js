@@ -1,7 +1,7 @@
 (function () {
   const SERVER_URLS = [
-    "https://presage-party.onrender.com",
-    "https://presage-party.enzonic.dev"
+    "https://finchparty.saturumah.net",
+    "https://presage-party.onrender.com"
   ];
 
   const LEVEL_PROMPTS = {
@@ -301,7 +301,7 @@
     });
 
     socket.on("connect", () => {
-      setServerInfo("Connected to: " + url + (serverIndex === 0 ? " (Primary Render)" : " (Backup Enzonic)"));
+      setServerInfo("Connected to: " + url + (serverIndex === 0 ? " (Primary finchparty)" : " (Fallback Render)"));
       setStatus("Connected! Ready to play or join a room.", "#4ade80");
       socket.emit("get_rooms");
     });
@@ -313,7 +313,7 @@
         setStatus("Primary server unreachable, switching to backup...", "#fbbf24");
         connectWithFailover();
       } else {
-        setStatus("Failed to connect to Render & Enzonic: " + (err && err.message ? err.message : err), "#f87171");
+        setStatus("Failed to connect to finchparty & Render: " + (err && err.message ? err.message : err), "#f87171");
       }
     });
 

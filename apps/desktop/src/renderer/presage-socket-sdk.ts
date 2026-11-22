@@ -11,28 +11,79 @@ export interface TelemetryPayload {
 }
 
 export interface PresageSdkOptions {
-  serverUrl: string;
+  serverUrls?: string[];
   targetFps?: number;
   authToken?: string;
+  connectTimeoutMs?: number;
 }
 
+export const DEFAULT_SERVER_URLS = [
+  'https://presage-party.onrender.com',
+  'https://presage-party.enzonic.dev',
+];
+
 export class PresageSocketSDK {
-  private socket: Socket;
+  private socket!: Socket;
+  private serverUrls: string[];
+  private currentUrlIndex = 0;
   private minIntervalMs: number;
   private lastSentAt = 0;
   private pendingTimer: ReturnType<typeof setTimeout> | null = null;
   private latestPayload: TelemetryPayload | null = null;
+  private listeners: Array<{ event: string; handler: (data: any) => void }> = [];
+  private authToken?: string;
+  private connectTimeoutMs: number;
 
-  constructor(options: PresageSdkOptions) {
+  constructor(options: PresageSdkOptions = {}) {
+    this.serverUrls =
+      options.serverUrls && options.serverUrls.length > 0
+        ? options.serverUrls
+        : DEFAULT_SERVER_URLS;
+    this.authToken = options.authToken;
+    this.connectTimeoutMs = options.connectTimeoutMs ?? 4000;
+
     const fps = Math.max(1, Math.min(30, options.targetFps ?? 10));
     this.minIntervalMs = Math.floor(1000 / fps);
 
-    this.socket = io(options.serverUrl, {
+    this.connectToCurrent();
+  }
+
+  private connectToCurrent(): void {
+    const activeUrl = this.serverUrls[this.currentUrlIndex];
+    if (this.socket) {
+      this.socket.removeAllListeners();
+      this.socket.disconnect();
+    }
+
+    this.socket = io(activeUrl, {
       transports: ['websocket', 'polling'],
       reconnection: true,
-      reconnectionDelay: 1000,
-      auth: options.authToken ? { token: options.authToken } : undefined,
+      reconnectionAttempts: 2,
+      reconnectionDelay: 800,
+      timeout: this.connectTimeoutMs,
+      auth: this.authToken ? { token: this.authToken } : undefined,
     });
+
+    for (const { event, handler } of this.listeners) {
+      this.socket.on(event, handler);
+    }
+
+    this.socket.on('connect', () => {
+      console.log('[PresageSDK] Connected to:', activeUrl);
+    });
+
+    this.socket.on('connect_error', (err) => {
+      console.warn(`[PresageSDK] Failed (${activeUrl}):`, err.message);
+      if (this.currentUrlIndex + 1 < this.serverUrls.length) {
+        this.currentUrlIndex += 1;
+        console.log('[PresageSDK] Failing over to:', this.serverUrls[this.currentUrlIndex]);
+        this.connectToCurrent();
+      }
+    });
+  }
+
+  public getActiveServerUrl(): string {
+    return this.serverUrls[this.currentUrlIndex];
   }
 
   public setFps(fps: number): void {
@@ -76,6 +127,7 @@ export class PresageSocketSDK {
   }
 
   public on<T = unknown>(event: string, handler: (data: T) => void): void {
+    this.listeners.push({ event, handler });
     this.socket.on(event, handler);
   }
 

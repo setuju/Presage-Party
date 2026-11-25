@@ -1,0 +1,26 @@
+# robots.txt for finchroyale.saturumah.net
+User-agent: *
+Allow: /
+Disallow: /data/
+Disallow: /cgi-bin/
+
+# Major Search Engine Crawlers
+User-agent: Googlebot
+Allow: /
+
+User-agent: Bingbot
+Allow: /
+
+User-agent: Slurp
+Allow: /
+
+User-agent: DuckDuckBot
+Allow: /
+
+User-agent: Baiduspider
+Allow: /
+
+User-agent: YandexBot
+Allow: /
+
+Sitemap: https://finchroyale.saturumah.net/sitemap.xml

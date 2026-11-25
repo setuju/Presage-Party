@@ -1,0 +1,17 @@
+{
+  "name": "Flinch Royale — Presage Party",
+  "short_name": "FlinchRoyale",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#FFF6E5",
+  "theme_color": "#FF7A5C",
+  "description": "8-Bit Real-Time Biometric Composure Arcade Game powered by Presage SmartSpectra SDK.",
+  "icons": [
+    {
+      "src": "./assets/preview.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}

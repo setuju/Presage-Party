@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Terms &amp; Conditions — Flinch Royale | Presage Party</title>
+  <meta name="description" content="Terms of Service and Conditions for playing Flinch Royale on SatuRumah.net.">
+  <link rel="canonical" href="https://finchroyale.saturumah.net/terms.html">
+  <meta property="og:title" content="Terms &amp; Conditions — Flinch Royale">
+  <meta property="og:description" content="Standard fair play, sportsmanship, and terms of service.">
+  <meta property="og:url" content="https://finchroyale.saturumah.net/terms.html">
+  <script>
+    (function () {
+      try {
+        var t = localStorage.getItem("saturumah-theme") || "light";
+        document.documentElement.setAttribute("data-theme", t);
+      } catch (e) {}
+    })();
+  </script>
+    <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#FFE9C4">
+  <link rel="stylesheet" href="pixel-theme.css">
+</head>
+<body>
+  <div class="shell">
+    <header class="header">
+      <div class="brand-wrapper">
+        <h1 class="brand-title">📜 Terms of Service</h1>
+      </div>
+      <div class="badges">
+        <button class="theme-toggle-btn" type="button" aria-label="Toggle Theme" onclick="togglePixelTheme()">
+          <span id="theme-icon">☀</span>
+        </button>
+      </div>
+    </header>
+
+    <nav class="tabbar" aria-label="Primary Sections">
+      <a href="index.html" class="tab" style="text-decoration:none;">🎮 1. Game Arena</a>
+      <a href="leaderboard.html" class="tab" style="text-decoration:none;">👑 2. Leaderboard</a>
+      <a href="how-to-play.html" class="tab" style="text-decoration:none;">📖 3. How to Play</a>
+      <a href="about.html" class="tab" style="text-decoration:none;">ℹ️ 4. About</a>
+      <a href="privacy.html" class="tab" style="text-decoration:none;">🛡️ 5. Privacy Policy</a>
+      <a href="terms.html" class="tab active" style="text-decoration:none;">📜 6. Terms</a>
+    </nav>
+
+    <div class="card">
+      <div class="card-head">
+        <span>📜 Terms of Service &amp; Fair Play Rules</span>
+        <span class="badge-master">LEGAL</span>
+      </div>
+      <div class="info-box" style="margin-bottom:16px;">
+        <strong style="color:var(--accent);font-size:16px;display:block;margin-bottom:6px;">Agreement:</strong>
+        <p style="margin:0;">By playing <strong>Flinch Royale</strong>, you agree to these fair-play conditions and terms of service governing the SatuRumah gaming network.</p>
+      </div>
+
+      <div class="card-head" style="margin-top:20px;">
+        <span>⚖️ 1. Fair Play &amp; Sportsmanship</span>
+      </div>
+      <div class="info-box" style="margin-bottom:20px;">
+        <p style="margin:4px 0;">• Play in good faith without injecting automated cheat scripts, botting video streams, or spoofing mock telemetry.</p>
+        <p style="margin:4px 0;">• Respect fellow players: offensive, hateful, or abusive player nicknames are prohibited.</p>
+        <p style="margin:4px 0;">• Accept anti-cheat mechanics: composure deductions occur if you minimize or switch tabs during competitive rounds.</p>
+      </div>
+
+      <div class="card-head" style="margin-top:20px;">
+        <span>🎮 2. Intellectual Property &amp; Challenge Framework</span>
+      </div>
+      <div class="info-box" style="margin-bottom:20px;">
+        <p style="margin:4px 0;">The source code, retro 8-bit styling, and game assets were created for the Presage SmartSpectra SDK Challenge and are hosted on <a href="https://saturumah.net" target="_blank" rel="noopener">saturumah.net</a>. All rights reserved.</p>
+      </div>
+
+      <div class="card-head" style="margin-top:20px;">
+        <span>⚠️ 3. Entertainment Disclaimer</span>
+      </div>
+      <div class="info-box" style="margin-bottom:20px;">
+        <p style="margin:4px 0;">The game and its distraction cues (audio spikes, sudden jumpscares) are provided strictly for entertainment purposes. Individuals with light sensitivity, epilepsy, or cardiac concerns should exercise caution when playing Level 4 ("Don't Scream").</p>
+      </div>
+
+      <div class="card-head" style="margin-top:20px;">
+        <span>🔄 4. Platform Evolution</span>
+      </div>
+      <div class="info-box">
+        <p style="margin:4px 0;">We reserve the right to update gameplay mechanics, balancing penalties, or these terms to maintain fairness, security, and integrity across the SatuRumah network.</p>
+      </div>
+    </div>
+
+    <!-- 8-BIT RETRO FOOTER -->
+    <footer class="site-footer">
+      <div class="footer-inner">
+        <div class="footer-brand">👾 Flinch Royale</div>
+        <nav class="footer-nav">
+          <a href="index.html">Game Arena</a>
+          <a href="leaderboard.html">Leaderboard</a>
+          <a href="how-to-play.html">How to Play</a>
+          <a href="about.html">About</a>
+          <a href="privacy.html">Privacy Policy</a>
+          <a href="terms.html" style="color:var(--accent);">Terms of Service</a>
+          <a href="sitemap.html">Sitemap</a>
+          <a href="https://saturumah.net" target="_blank" rel="noopener" class="footer-saturumah-pill">🏠 SatuRumah.net</a>
+        </nav>
+      </div>
+      <div class="footer-copy">
+        <span>© 2026 Flinch Royale · Presage SmartSpectra SDK Challenge.</span>
+        <span>A proud member of the SatuRumah Network.</span>
+      </div>
+    </footer>
+  </div>
+
+  <script>
+    function togglePixelTheme() {
+      const current = document.documentElement.getAttribute("data-theme") || "light";
+      const next = current === "dark" ? "light" : "dark";
+      document.documentElement.setAttribute("data-theme", next);
+      try { localStorage.setItem("saturumah-theme", next); } catch (e) {}
+      updateThemeIcon();
+    }
+    function updateThemeIcon() {
+      const icon = document.getElementById("theme-icon");
+      if (!icon) return;
+      const theme = document.documentElement.getAttribute("data-theme");
+      icon.textContent = theme === "dark" ? "🌙" : "☀";
+    }
+    document.addEventListener("DOMContentLoaded", updateThemeIcon);
+  </script>
+</body>
+</html>

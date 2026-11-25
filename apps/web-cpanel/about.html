@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>About — Flinch Royale | Presage Party</title>
+  <meta name="description" content="Discover the origins and technology behind Flinch Royale, powered by Presage SmartSpectra SDK and SatuRumah.">
+  <link rel="canonical" href="https://finchroyale.saturumah.net/about.html">
+  <meta property="og:title" content="About — Flinch Royale">
+  <meta property="og:description" content="The privacy-first retro body-signal arcade game built for competitive composure.">
+  <meta property="og:url" content="https://finchroyale.saturumah.net/about.html">
+  <script>
+    (function () {
+      try {
+        var t = localStorage.getItem("saturumah-theme") || "light";
+        document.documentElement.setAttribute("data-theme", t);
+      } catch (e) {}
+    })();
+  </script>
+    <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#FFE9C4">
+  <link rel="stylesheet" href="pixel-theme.css">
+</head>
+<body>
+  <div class="shell">
+    <header class="header">
+      <div class="brand-wrapper">
+        <h1 class="brand-title">ℹ️ About Flinch Royale</h1>
+      </div>
+      <div class="badges">
+        <button class="theme-toggle-btn" type="button" aria-label="Toggle Theme" onclick="togglePixelTheme()">
+          <span id="theme-icon">☀</span>
+        </button>
+      </div>
+    </header>
+
+    <nav class="tabbar" aria-label="Primary Sections">
+      <a href="index.html" class="tab" style="text-decoration:none;">🎮 1. Game Arena</a>
+      <a href="leaderboard.html" class="tab" style="text-decoration:none;">👑 2. Leaderboard</a>
+      <a href="how-to-play.html" class="tab" style="text-decoration:none;">📖 3. How to Play</a>
+      <a href="about.html" class="tab active" style="text-decoration:none;">ℹ️ 4. About</a>
+      <a href="privacy.html" class="tab" style="text-decoration:none;">🛡️ 5. Privacy Policy</a>
+      <a href="terms.html" class="tab" style="text-decoration:none;">📜 6. Terms</a>
+    </nav>
+
+    <div class="card">
+      <div class="card-head">
+        <span>🕹️ The Composure Arcade Challenge</span>
+        <span class="badge-master">ABOUT</span>
+      </div>
+      <div class="info-box" style="margin-bottom:16px;">
+        <strong style="color:var(--accent);font-size:16px;display:block;margin-bottom:6px;">Origin &amp; Mission:</strong>
+        <p style="margin:0;"><strong>Flinch Royale</strong> was designed and developed for the <em>Presage SmartSpectra SDK Challenge</em>. Combining the nostalgia of classic 8-bit retro arcade aesthetics with cutting-edge optical and biometric telemetry, it turns facial composure into a competitive multiplayer sport.</p>
+      </div>
+
+      <div class="card-head" style="margin-top:20px;">
+        <span>💡 Technology Architecture</span>
+      </div>
+      <div class="grid-2" style="margin-bottom:20px;">
+        <div class="info-box">
+          <strong style="color:var(--green);font-size:15px;display:block;margin-bottom:4px;">🛡️ SmartSpectra SDK Principles</strong>
+          Derived metrics (blink frequency, speech cues, breathing stability) are computed locally without storing or streaming raw video feeds to external servers.
+        </div>
+        <div class="info-box">
+          <strong style="color:var(--blue);font-size:15px;display:block;margin-bottom:4px;">🔒 Zero-Cloud Video Privacy</strong>
+          Webcam frames are processed directly inside your browser memory using high-performance optical flow differential analysis.
+        </div>
+        <div class="info-box">
+          <strong style="color:var(--amber);font-size:15px;display:block;margin-bottom:4px;">⚡ Multiplayer Synchronization</strong>
+          Low-latency Socket.IO orchestrates room matching, guest challenges, anti-cheat detection, and synchronized distraction reel playlists.
+        </div>
+        <div class="info-box">
+          <strong style="color:var(--purple);font-size:15px;display:block;margin-bottom:4px;">🎨 8-Bit SatuRumah Theme</strong>
+          Pixel borders, hard-edge shadows, and the warm "Sunset Over a Pixel Village" color palette provide seamless visual unity across all devices.
+        </div>
+      </div>
+
+      <div class="card-head" style="margin-top:20px;">
+        <span>🏠 The SatuRumah Network</span>
+      </div>
+      <div class="info-box">
+        <p style="margin:4px 0;">Flinch Royale is proud to be part of the digital creative universe at <a href="https://saturumah.net" target="_blank" rel="noopener"><strong>saturumah.net</strong></a> — a digital home for indie web applications, arcade retrospectives, and interactive software experiments.</p>
+      </div>
+    </div>
+
+    <!-- 8-BIT RETRO FOOTER -->
+    <footer class="site-footer">
+      <div class="footer-inner">
+        <div class="footer-brand">👾 Flinch Royale</div>
+        <nav class="footer-nav">
+          <a href="index.html">Game Arena</a>
+          <a href="leaderboard.html">Leaderboard</a>
+          <a href="how-to-play.html">How to Play</a>
+          <a href="about.html" style="color:var(--accent);">About</a>
+          <a href="privacy.html">Privacy Policy</a>
+          <a href="terms.html">Terms of Service</a>
+          <a href="sitemap.html">Sitemap</a>
+          <a href="https://saturumah.net" target="_blank" rel="noopener" class="footer-saturumah-pill">🏠 SatuRumah.net</a>
+        </nav>
+      </div>
+      <div class="footer-copy">
+        <span>© 2026 Flinch Royale · Presage SmartSpectra SDK Challenge.</span>
+        <span>A proud member of the SatuRumah Network.</span>
+      </div>
+    </footer>
+  </div>
+
+  <script>
+    function togglePixelTheme() {
+      const current = document.documentElement.getAttribute("data-theme") || "light";
+      const next = current === "dark" ? "light" : "dark";
+      document.documentElement.setAttribute("data-theme", next);
+      try { localStorage.setItem("saturumah-theme", next); } catch (e) {}
+      updateThemeIcon();
+    }
+    function updateThemeIcon() {
+      const icon = document.getElementById("theme-icon");
+      if (!icon) return;
+      const theme = document.documentElement.getAttribute("data-theme");
+      icon.textContent = theme === "dark" ? "🌙" : "☀";
+    }
+    document.addEventListener("DOMContentLoaded", updateThemeIcon);
+  </script>
+</body>
+</html>

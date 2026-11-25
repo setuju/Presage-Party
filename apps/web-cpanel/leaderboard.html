@@ -1,0 +1,565 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <script>
+    (function () {
+      try {
+        var t = localStorage.getItem("saturumah-theme") || "light";
+        document.documentElement.setAttribute("data-theme", t);
+      } catch (e) {}
+    })();
+  </script>
+
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Global Leaderboards — Flinch Royale</title>
+      <meta name="description" content="Official 5-Division Leaderboard for Flinch Royale. Real-time composure rankings and total championship standings.">
+  <link rel="canonical" href="https://finchroyale.saturumah.net/leaderboard.html">
+  <meta property="og:title" content="Leaderboard — Flinch Royale">
+  <meta property="og:description" content="Top composure survival scores across Chill Mode, Seriously, Why So Serious, and Don't Scream.">
+  <meta property="og:url" content="https://finchroyale.saturumah.net/leaderboard.html">
+    <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#FFE9C4">
+  <link rel="stylesheet" href="pixel-theme.css">
+  <style>
+    /* LEADERBOARD RETRO SPECIFICS */
+    .board-card {
+      background: var(--surface);
+      border: var(--pixel-border);
+      box-shadow: var(--pixel-shadow-lg);
+      padding: 24px;
+      margin-bottom: 24px;
+    }
+    .board-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 20px;
+      flex-wrap: wrap;
+      gap: 12px;
+      border-bottom: var(--pixel-border);
+      padding-bottom: 16px;
+    }
+    .board-header h2 {
+      margin: 0;
+      font-size: 16px;
+      font-family: var(--font-pixel);
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .board-header .desc {
+      font-family: var(--font-ui);
+      font-size: 18px;
+      color: var(--text-muted);
+      margin-top: 4px;
+    }
+
+    .tab-btn {
+      background: var(--surface);
+      border: var(--pixel-border);
+      box-shadow: var(--pixel-shadow);
+      padding: 12px 18px;
+      color: var(--text-muted);
+      font-family: var(--font-ui);
+      font-size: 20px;
+      font-weight: 700;
+      cursor: pointer;
+      white-space: nowrap;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      transition: transform 0.1s;
+    }
+    .tab-btn:hover {
+      background: var(--accent-2);
+      color: var(--text);
+      transform: translate(-1px, -1px);
+    }
+    .tab-btn.active {
+      background: var(--accent);
+      color: #fff;
+      transform: translate(-2px, -2px);
+      box-shadow: var(--pixel-shadow-lg);
+    }
+    .tab-btn.active.tab-total {
+      background: var(--accent-2);
+      color: #3A2337;
+    }
+
+    .board-table {
+      width: 100%;
+      border-collapse: separate;
+      border-spacing: 0 10px;
+    }
+    .board-table th {
+      text-align: left;
+      font-family: var(--font-ui);
+      font-size: 16px;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      color: var(--text-muted);
+      padding: 6px 14px;
+    }
+    .board-table th.text-right { text-align: right; }
+    .board-table tr.row-item {
+      background: var(--surface-2);
+      border: var(--pixel-border);
+      box-shadow: var(--pixel-shadow-sm);
+    }
+    .board-table td {
+      padding: 14px;
+      font-size: 15px;
+      border-top: var(--pixel-border);
+      border-bottom: var(--pixel-border);
+    }
+    .board-table td:first-child { border-left: var(--pixel-border); }
+    .board-table td:last-child { border-right: var(--pixel-border); }
+
+    .rank-cell {
+      font-family: var(--font-pixel);
+      font-size: 14px;
+      width: 60px;
+      text-align: center;
+    }
+    .player-cell {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-weight: 700;
+      font-size: 16px;
+    }
+    .badge {
+      display: inline-block;
+      padding: 3px 8px;
+      font-family: var(--font-ui);
+      font-size: 15px;
+      border: 2px solid var(--border);
+    }
+    .badge-host { background: var(--accent-2); color: #3A2337; }
+    .badge-guest { background: var(--accent-3); color: #3A2337; }
+    .badge-solo { background: #e9d5ff; color: #6b21a8; }
+
+    .score-cell {
+      text-align: right;
+      font-family: var(--font-pixel);
+      font-size: 14px;
+      color: var(--green);
+    }
+    .score-cell.score-total {
+      color: var(--accent);
+      font-size: 16px;
+    }
+    .date-cell {
+      text-align: right;
+      font-family: var(--font-mono);
+      color: var(--text-muted);
+      font-size: 14px;
+    }
+
+    /* PODIUM */
+    .podium-container {
+      display: grid;
+      grid-template-columns: 1fr 1.2fr 1fr;
+      gap: 16px;
+      margin-bottom: 24px;
+      align-items: end;
+    }
+    @media (max-width: 600px) {
+      .podium-container { grid-template-columns: 1fr; }
+    }
+    .podium-card {
+      background: var(--surface-2);
+      border: var(--pixel-border);
+      box-shadow: var(--pixel-shadow);
+      padding: 16px;
+      text-align: center;
+    }
+    .podium-card.first {
+      background: var(--accent-2);
+      color: #3A2337;
+      transform: translateY(-8px);
+      box-shadow: var(--pixel-shadow-lg);
+    }
+    .podium-rank { font-size: 28px; margin-bottom: 4px; }
+    .podium-name { font-family: var(--font-pixel); font-size: 12px; }
+    .podium-score { font-family: var(--font-pixel); font-size: 14px; margin-top: 8px; font-weight: 900; }
+  </style>
+</head>
+<body>
+  <div class="shell">
+    <header class="header">
+      <div>
+        <h1 class="brand-title">🏆 Flinch Royale Leaderboards</h1>
+        <div class="brand-sub">5 Distinct Competitive Divisions — Persisted Global Standings</div>
+      </div>
+      <div class="nav-actions">
+        <button class="theme-toggle-btn" type="button" aria-label="Toggle Theme" onclick="togglePixelTheme()">
+          <span id="theme-icon">☀</span>
+        </button>
+        <a href="index.html" class="btn">🎮 Back to Game</a>
+        <a href="how-to-play.html" class="btn">📖 How to Play</a>
+        <button type="button" class="btn" onclick="fetchLeaderboards(true)">🔄 Refresh</button>
+      </div>
+    </header>
+
+    <!-- 5 TABS -->
+    <nav class="tabbar" aria-label="Leaderboard Divisions">
+      <button type="button" class="tab-btn active" data-board="1" onclick="switchBoard(1)">
+        🟢 1. Chill Mode
+      </button>
+      <button type="button" class="tab-btn" data-board="2" onclick="switchBoard(2)">
+        🟡 2. Seriously?
+      </button>
+      <button type="button" class="tab-btn" data-board="3" onclick="switchBoard(3)">
+        🔴 3. Why So Serious?
+      </button>
+      <button type="button" class="tab-btn" data-board="4" onclick="switchBoard(4)">
+        🔥 4. Don't Scream
+      </button>
+      <button type="button" class="tab-btn tab-total" data-board="total" onclick="switchBoard('total')">
+        👑 5. Total Game Championship
+      </button>
+    </nav>
+
+    <!-- CARD CONTENT -->
+    <main class="board-card">
+      <div class="board-header">
+        <div>
+          <h2 id="board-title">🟢 Level 1: Chill Mode Standings</h2>
+          <div id="board-desc" class="desc">Baseline composure test. Ranked by composure survival score out of 1000.</div>
+        </div>
+        <div id="board-meta" class="desc">Loading records...</div>
+      </div>
+
+      <!-- Top 3 Podium (dynamically shown if >= 3 entries) -->
+      <div id="podium-area" class="podium-container" style="display:none;"></div>
+
+      <!-- Table of entries -->
+      <div style="overflow-x: auto;">
+        <table class="board-table">
+          <thead>
+            <tr id="table-head-row">
+              <th style="width:50px;">Rank</th>
+              <th>Player</th>
+              <th>Mode / Details</th>
+              <th class="text-right">Score</th>
+              <th class="text-right">Recorded</th>
+            </tr>
+          </thead>
+          <tbody id="board-tbody">
+            <tr>
+              <td colspan="5" class="empty-state">Loading latest standings...</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </main>
+
+    <!-- 8-BIT RETRO FOOTER -->
+    <footer class="site-footer">
+      <div class="footer-inner">
+        <div class="footer-brand">👾 Flinch Royale</div>
+        <nav class="footer-nav">
+          <a href="index.html">Game Arena</a>
+          <a href="leaderboard.html" style="color:var(--accent);">Leaderboard</a>
+          <a href="how-to-play.html">How to Play</a>
+          <a href="about.html">About</a>
+          <a href="privacy.html">Privacy Policy</a>
+          <a href="terms.html">Terms of Service</a>
+          <a href="sitemap.html">Sitemap</a>
+          <a href="https://saturumah.net" target="_blank" rel="noopener" class="footer-saturumah-pill">🏠 SatuRumah.net</a>
+        </nav>
+      </div>
+      <div class="footer-copy">
+        <span>© 2026 Flinch Royale · Presage SmartSpectra SDK Challenge.</span>
+        <span>A proud member of the SatuRumah Network.</span>
+      </div>
+    </footer>
+  </div>
+
+  <script>
+    const BOARD_INFO = {
+      1: {
+        title: "🟢 Level 1: Chill Mode Division",
+        desc: "Baseline composure test without active distraction cues. Maximum score: 1000.",
+        empty: "No contenders for Chill Mode yet. Play round 1 to stake your claim!"
+      },
+      2: {
+        title: "🟡 Level 2: Seriously? Division",
+        desc: "Audio & text voice distractions active. Maximum score: 1000.",
+        empty: "No contenders for Level 2 yet. Resist the audio cues and survive!"
+      },
+      3: {
+        title: "🔴 Level 3: Why So Serious? Division",
+        desc: "Vertical Viral Reels challenge with optical flinch tracking. Maximum score: 1000.",
+        empty: "No contenders for Level 3 yet. Download asset pack & hold your face steady!"
+      },
+      4: {
+        title: "🔥 Level 4: Don't Scream Division",
+        desc: "Jumpscare spikes with brutal post-scare composure penalties (-15). Maximum score: 1000.",
+        empty: "No brave souls recorded for Don't Scream yet. Step into the arena if you dare!"
+      },
+      5: {
+        title: "👑 Overall Championship: Total Game Played & Master Score",
+        desc: "Cumulative composure points across all played modes. Proves total mastery.",
+        empty: "No cumulative scores recorded yet. Compete across all 4 modes!"
+      }
+    };
+
+    let currentBoard = 1;
+    let cachedData = null;
+
+    function escapeHTML(str) {
+      return String(str || "").replace(/[&<>"']/g, function (c) {
+        return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+      });
+    }
+
+    function switchBoard(id) {
+      currentBoard = id;
+      document.querySelectorAll(".tab-btn").forEach(btn => {
+        const boardAttr = btn.getAttribute("data-board");
+        btn.classList.toggle("active", String(boardAttr) === String(id));
+      });
+      renderCurrentBoard();
+    }
+
+    async function fetchLeaderboards(showRefreshFeedback) {
+      const metaEl = document.getElementById("board-meta");
+      if (metaEl && showRefreshFeedback) metaEl.textContent = "Refreshing data...";
+      try {
+        const res = await fetch("api_leaderboard.php?action=get", { cache: "no-store" });
+        if (!res.ok) throw new Error("HTTP " + res.status);
+        const json = await res.json();
+        if (json && json.ok) {
+          cachedData = json;
+          // Also sync with localStorage if offline
+          localStorage.setItem("flinch_leaderboard_cache_v2", JSON.stringify(json));
+          renderCurrentBoard();
+          if (metaEl) metaEl.textContent = "Synced: " + new Date().toLocaleTimeString();
+          return;
+        }
+      } catch (e) {
+        console.warn("Could not load from API, falling back to local cache/storage", e);
+      }
+
+      // Fallback to local storage
+      try {
+        const local = localStorage.getItem("flinch_leaderboard_cache_v2");
+        if (local) {
+          cachedData = JSON.parse(local);
+          renderCurrentBoard();
+          if (metaEl) metaEl.textContent = "Offline cache restored";
+          return;
+        }
+      } catch (e) {}
+
+      // Fallback from legacy scoreboard storage
+      buildFallbackFromLegacy();
+    }
+
+    function buildFallbackFromLegacy() {
+      try {
+        const raw = localStorage.getItem("flinch_royale_scoreboard_v1");
+        const list = raw ? JSON.parse(raw) : [];
+        const modeMap = {
+          "Chill Mode": 1,
+          "Seriously?": 2,
+          "Why So Serious?": 3,
+          "Don't Scream": 4
+        };
+        const res = { ok: true, mode_1: [], mode_2: [], mode_3: [], mode_4: [], total: [] };
+        const totalMap = {};
+
+        list.forEach(item => {
+          const mId = modeMap[item.modeName] || 1;
+          const key = "mode_" + mId;
+          res[key].push({
+            name: item.name,
+            score: item.score,
+            role: item.role || "solo",
+            mode_name: item.modeName,
+            created_at: item.date || "Recent"
+          });
+
+          if (!totalMap[item.name]) {
+            totalMap[item.name] = { name: item.name, total_score: 0, modes_beaten: 0, best_score: 0, last_played: item.date || "Recent" };
+          }
+          totalMap[item.name].total_score += (item.score || 0);
+          totalMap[item.name].modes_beaten += 1;
+          if (item.score > totalMap[item.name].best_score) totalMap[item.name].best_score = item.score;
+        });
+
+        res.total = Object.values(totalMap).sort((a,b) => b.total_score - a.total_score);
+        cachedData = res;
+        renderCurrentBoard();
+      } catch (e) {
+        console.error("Fallback error:", e);
+      }
+    }
+
+    function renderCurrentBoard() {
+      const titleEl = document.getElementById("board-title");
+      const descEl = document.getElementById("board-desc");
+      const tbodyEl = document.getElementById("board-tbody");
+      const headRowEl = document.getElementById("table-head-row");
+      const podiumEl = document.getElementById("podium-area");
+
+      const isTotal = currentBoard === "total" || currentBoard === 5;
+      const infoKey = isTotal ? 5 : currentBoard;
+      const info = BOARD_INFO[infoKey];
+
+      if (titleEl) titleEl.textContent = info.title;
+      if (descEl) descEl.textContent = info.desc;
+
+      if (!cachedData) {
+        tbodyEl.innerHTML = '<tr><td colspan="5" class="empty-state">Loading data...</td></tr>';
+        return;
+      }
+
+      if (isTotal) {
+        // Render Total Championship
+        headRowEl.innerHTML = `
+          <th style="width:60px;">Rank</th>
+          <th>Master Player</th>
+          <th>Modes Conquered</th>
+          <th class="text-right">Peak Single Score</th>
+          <th class="text-right">Total Score</th>
+        `;
+
+        const list = cachedData.total || [];
+        renderPodium(list, true);
+
+        if (list.length === 0) {
+          tbodyEl.innerHTML = `<tr><td colspan="5" class="empty-state">${escapeHTML(info.empty)}</td></tr>`;
+          return;
+        }
+
+        tbodyEl.innerHTML = list.map((item, idx) => {
+          const rank = idx + 1;
+          const rankClass = rank === 1 ? "rank-1" : rank === 2 ? "rank-2" : rank === 3 ? "rank-3" : "";
+          const rankIcon = rank === 1 ? "🥇" : rank === 2 ? "🥈" : rank === 3 ? "🥉" : "#" + rank;
+          return `
+            <tr class="row-item">
+              <td class="rank-cell ${rankClass}">${rankIcon}</td>
+              <td>
+                <div class="player-cell">
+                  <span>${escapeHTML(item.name)}</span>
+                  <span class="badge badge-host">CHAMPION</span>
+                </div>
+              </td>
+              <td class="muted">${item.modes_beaten} / 4 Modes</td>
+              <td class="score-cell text-right" style="color:var(--blue);font-size:15px;">${item.best_score} pts</td>
+              <td class="score-cell score-total text-right">${item.total_score} pts</td>
+            </tr>
+          `;
+        }).join("");
+
+      } else {
+        // Individual Mode 1-4
+        headRowEl.innerHTML = `
+          <th style="width:60px;">Rank</th>
+          <th>Player</th>
+          <th>Division Role</th>
+          <th class="text-right">Composure Score</th>
+          <th class="text-right">Recorded</th>
+        `;
+
+        const key = "mode_" + currentBoard;
+        const list = cachedData[key] || [];
+        renderPodium(list, false);
+
+        if (list.length === 0) {
+          tbodyEl.innerHTML = `<tr><td colspan="5" class="empty-state">${escapeHTML(info.empty)}</td></tr>`;
+          return;
+        }
+
+        tbodyEl.innerHTML = list.map((item, idx) => {
+          const rank = idx + 1;
+          const rankClass = rank === 1 ? "rank-1" : rank === 2 ? "rank-2" : rank === 3 ? "rank-3" : "";
+          const rankIcon = rank === 1 ? "🥇" : rank === 2 ? "🥈" : rank === 3 ? "🥉" : "#" + rank;
+          const roleClass = item.role === "host" ? "badge-host" : item.role === "guest" ? "badge-guest" : "badge-solo";
+          const roleText = item.role === "host" ? "👑 HOST" : item.role === "guest" ? "🎮 GUEST" : "⚡ SOLO";
+
+          const dateStr = item.created_at ? item.created_at.replace("T", " ").substring(0, 16) : "-";
+
+          return `
+            <tr class="row-item">
+              <td class="rank-cell ${rankClass}">${rankIcon}</td>
+              <td>
+                <div class="player-cell">
+                  <span>${escapeHTML(item.name)}</span>
+                </div>
+              </td>
+              <td><span class="badge ${roleClass}">${roleText}</span></td>
+              <td class="score-cell text-right">${item.score} / 1000</td>
+              <td class="date-cell text-right">${escapeHTML(dateStr)}</td>
+            </tr>
+          `;
+        }).join("");
+      }
+    }
+
+    function renderPodium(list, isTotal) {
+      const podiumEl = document.getElementById("podium-area");
+      if (!podiumEl) return;
+      if (!list || list.length < 3) {
+        podiumEl.style.display = "none";
+        return;
+      }
+      podiumEl.style.display = "grid";
+
+      const p1 = list[0];
+      const p2 = list[1];
+      const p3 = list[2];
+
+      const score1 = isTotal ? p1.total_score + " pts" : p1.score + " / 1000";
+      const score2 = isTotal ? p2.total_score + " pts" : p2.score + " / 1000";
+      const score3 = isTotal ? p3.total_score + " pts" : p3.score + " / 1000";
+
+      podiumEl.innerHTML = `
+        <div class="podium-card second">
+          <div class="podium-rank">🥈</div>
+          <div class="podium-name">${escapeHTML(p2.name)}</div>
+          <div class="podium-score" style="color:var(--silver);">${score2}</div>
+        </div>
+        <div class="podium-card first">
+          <div class="podium-rank">👑 🥇</div>
+          <div class="podium-name">${escapeHTML(p1.name)}</div>
+          <div class="podium-score" style="color:var(--gold);">${score1}</div>
+        </div>
+        <div class="podium-card third">
+          <div class="podium-rank">🥉</div>
+          <div class="podium-name">${escapeHTML(p3.name)}</div>
+          <div class="podium-score" style="color:#f97316;">${score3}</div>
+        </div>
+      `;
+    }
+
+    // Auto-fetch on load & periodic refresh
+    window.addEventListener("DOMContentLoaded", () => {
+      fetchLeaderboards(false);
+      setInterval(() => fetchLeaderboards(false), 20000);
+    });
+  </script>
+
+  <script>
+    function togglePixelTheme() {
+      const current = document.documentElement.getAttribute("data-theme") || "light";
+      const next = current === "dark" ? "light" : "dark";
+      document.documentElement.setAttribute("data-theme", next);
+      try { localStorage.setItem("saturumah-theme", next); } catch (e) {}
+      updateThemeIcon();
+    }
+    function updateThemeIcon() {
+      const icon = document.getElementById("theme-icon");
+      if (!icon) return;
+      const theme = document.documentElement.getAttribute("data-theme");
+      icon.textContent = theme === "dark" ? "🌙" : "☀";
+    }
+    document.addEventListener("DOMContentLoaded", updateThemeIcon);
+  </script>
+</body>
+
+</html>

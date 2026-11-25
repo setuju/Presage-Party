@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>How to Play — Flinch Royale | Presage Party</title>
+  <meta name="description" content="Master composure rules, optical flinch detection, eye blink tracking, and distraction levels in Flinch Royale.">
+  <link rel="canonical" href="https://finchroyale.saturumah.net/how-to-play.html">
+  <meta property="og:title" content="How to Play — Flinch Royale">
+  <meta property="og:description" content="Learn how to maintain composure, avoid flinches, and conquer all 4 game modes.">
+  <meta property="og:url" content="https://finchroyale.saturumah.net/how-to-play.html">
+  <script>
+    (function () {
+      try {
+        var t = localStorage.getItem("saturumah-theme") || "light";
+        document.documentElement.setAttribute("data-theme", t);
+      } catch (e) {}
+    })();
+  </script>
+    <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#FFE9C4">
+  <link rel="stylesheet" href="pixel-theme.css">
+</head>
+<body>
+  <div class="shell">
+    <header class="header">
+      <div class="brand-wrapper">
+        <h1 class="brand-title">📖 How to Play</h1>
+      </div>
+      <div class="badges">
+        <button class="theme-toggle-btn" type="button" aria-label="Toggle Theme" onclick="togglePixelTheme()">
+          <span id="theme-icon">☀</span>
+        </button>
+      </div>
+    </header>
+
+    <nav class="tabbar" aria-label="Primary Sections">
+      <a href="index.html" class="tab" style="text-decoration:none;">🎮 1. Game Arena</a>
+      <a href="leaderboard.html" class="tab" style="text-decoration:none;">👑 2. Leaderboard</a>
+      <a href="how-to-play.html" class="tab active" style="text-decoration:none;">📖 3. How to Play</a>
+      <a href="about.html" class="tab" style="text-decoration:none;">ℹ️ 4. About</a>
+      <a href="privacy.html" class="tab" style="text-decoration:none;">🛡️ 5. Privacy Policy</a>
+      <a href="terms.html" class="tab" style="text-decoration:none;">📜 6. Terms</a>
+    </nav>
+
+    <div class="card">
+      <div class="card-head">
+        <span>🎮 Complete Player Survival Guide</span>
+        <span class="badge-master">ARCADE RULES</span>
+      </div>
+      <div class="info-box" style="margin-bottom:16px;">
+        <strong style="color:var(--accent);font-size:16px;display:block;margin-bottom:6px;">Objective:</strong>
+        <p style="margin:0;"><strong>Flinch Royale</strong> is a real-time biometric and optical composure game. Maintain unbroken focus, do not flinch, do not talk, and do not blink excessively while withstanding psychological distractors.</p>
+      </div>
+
+      <div class="card-head" style="margin-top:20px;">
+        <span>⚡ The Composure Meter (100% / 1000 Pts)</span>
+      </div>
+      <p style="font-size:15px;line-height:1.6;margin-bottom:12px;">Every round starts with <strong>100% Composure</strong> (equal to 1,000 points on the global scoreboard). Involuntary facial reflexes drain your composure:</p>
+      
+      <div class="grid-2" style="margin-bottom:20px;">
+        <div class="info-box">
+          <strong style="color:var(--coral);font-size:15px;display:block;margin-bottom:4px;">💥 Flinch / Head Motion (-6%)</strong>
+          Sudden jerking, nodding, or looking away is caught by frame-by-frame optical flow analysis.
+        </div>
+        <div class="info-box">
+          <strong style="color:var(--amber);font-size:15px;display:block;margin-bottom:4px;">👁️ Eye Blinks (-4%)</strong>
+          Excessive rapid blink bursts deduct composure. Keep your eyes steady on the target!
+        </div>
+        <div class="info-box">
+          <strong style="color:var(--purple);font-size:15px;display:block;margin-bottom:4px;">🗣️ Talking / Laughing (-8%)</strong>
+          Gasping, laughing, or talking triggers acoustic/motion detection.
+        </div>
+        <div class="info-box">
+          <strong style="color:var(--blue);font-size:15px;display:block;margin-bottom:4px;">🚫 Focus / Tab Loss (-10%)</strong>
+          Leaving or minimizing the browser tab triggers the anti-cheat composure penalty.
+        </div>
+      </div>
+
+      <div class="card-head" style="margin-top:20px;">
+        <span>🎯 The 4 Game Modes</span>
+      </div>
+      <div class="mode-grid" style="margin-bottom:20px;">
+        <div class="mode-btn btn-m1">
+          <strong style="color:var(--green);">🟢 Level 1: Chill Mode (Baseline)</strong>
+          <span>Pure composure endurance without active audio or video distractors. Great for calibrating your camera.</span>
+        </div>
+        <div class="mode-btn btn-m2">
+          <strong style="color:var(--amber);">🟡 Level 2: Seriously? (Audio Cues)</strong>
+          <span>Sudden speech synthesis, car horns, phone rings, and spoken questions ("Look behind you!", "Are you nervous?").</span>
+        </div>
+        <div class="mode-btn btn-m3">
+          <strong style="color:var(--coral);">🔴 Level 3: Why So Serious? (Viral Reels)</strong>
+          <span>Synchronized vertical video stream that automatically advances to the next reel once a clip finishes.</span>
+        </div>
+        <div class="mode-btn btn-m4">
+          <strong style="color:var(--purple);">🔥 Level 4: Don't Scream (Horror Spikes)</strong>
+          <span>Sudden jumpscare spikes trigger at unpredictable intervals with -15% composure penalties for post-scare flinches.</span>
+        </div>
+      </div>
+
+      <div class="card-head" style="margin-top:20px;">
+        <span>👥 Multiplayer Room Master Rules</span>
+      </div>
+      <div class="info-box">
+        <p style="margin:4px 0;">• The <strong>👑 ROOM MASTER</strong> chooses the exact Game Mode (1 to 4) and Round Duration (30s, 60s, or 180s).</p>
+        <p style="margin:4px 0;">• When Mode 3 is picked, the random playlist seed is distributed across all players so everyone watches and reacts to the identical reel at the exact same instant.</p>
+        <p style="margin:4px 0;">• Match scores are submitted automatically to the 5-Division Leaderboard upon round completion.</p>
+      </div>
+    </div>
+
+    <!-- 8-BIT RETRO FOOTER -->
+    <footer class="site-footer">
+      <div class="footer-inner">
+        <div class="footer-brand">👾 Flinch Royale</div>
+        <nav class="footer-nav">
+          <a href="index.html">Game Arena</a>
+          <a href="leaderboard.html">Leaderboard</a>
+          <a href="how-to-play.html" style="color:var(--accent);">How to Play</a>
+          <a href="about.html">About</a>
+          <a href="privacy.html">Privacy Policy</a>
+          <a href="terms.html">Terms of Service</a>
+          <a href="sitemap.html">Sitemap</a>
+          <a href="https://saturumah.net" target="_blank" rel="noopener" class="footer-saturumah-pill">🏠 SatuRumah.net</a>
+        </nav>
+      </div>
+      <div class="footer-copy">
+        <span>© 2026 Flinch Royale · Presage SmartSpectra SDK Challenge.</span>
+        <span>A proud member of the SatuRumah Network.</span>
+      </div>
+    </footer>
+  </div>
+
+  <script>
+    function togglePixelTheme() {
+      const current = document.documentElement.getAttribute("data-theme") || "light";
+      const next = current === "dark" ? "light" : "dark";
+      document.documentElement.setAttribute("data-theme", next);
+      try { localStorage.setItem("saturumah-theme", next); } catch (e) {}
+      updateThemeIcon();
+    }
+    function updateThemeIcon() {
+      const icon = document.getElementById("theme-icon");
+      if (!icon) return;
+      const theme = document.documentElement.getAttribute("data-theme");
+      icon.textContent = theme === "dark" ? "🌙" : "☀";
+    }
+    document.addEventListener("DOMContentLoaded", updateThemeIcon);
+  </script>
+</body>
+</html>

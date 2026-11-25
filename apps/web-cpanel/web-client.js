@@ -49,18 +49,55 @@
 
   const SCARY_FACES = ["😱", "👹", "💀", "👻", "😈"];
 
+  const STORAGE_KEY_SCORES = "flinch_royale_scoreboard_v1";
+  const STORAGE_KEY_ASSET_PACK = "flinch_video_pack_ready_v1";
+
+  function loadStoredScores() {
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY_SCORES);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed)) return parsed;
+      }
+    } catch (e) {}
+    return [];
+  }
+
+  function saveStoredScores() {
+    try {
+      localStorage.setItem(STORAGE_KEY_SCORES, JSON.stringify(scores));
+    } catch (e) {}
+  }
+
+  function checkStoredAssetPackReady() {
+    try {
+      return localStorage.getItem(STORAGE_KEY_ASSET_PACK) === "true";
+    } catch (e) {
+      return false;
+    }
+  }
+
+  const STORAGE_KEY_PLAYER_NAME = "flinch_player_name";
+
   let socket = null;
   let serverIndex = 0;
   let pollTimer = null;
 
-  let playerName = "Jack";
+  const storedPlayerName = (function () {
+    try {
+      return localStorage.getItem(STORAGE_KEY_PLAYER_NAME) || "";
+    } catch (e) {
+      return "";
+    }
+  })();
+  let playerName = storedPlayerName;
   let role = "solo";
   let roomCode = "";
   let players = [];
   let rooms = [];
-  let scores = [];
+  let scores = loadStoredScores();
 
-  let videoPackReady = false;
+  let videoPackReady = checkStoredAssetPackReady();
   let videoPackDownloading = false;
   const cachedBlobUrls = [];
 
@@ -69,6 +106,9 @@
   let roundRunning = false;
   let roundStartMs = 0;
   let roundEndMs = 0;
+  let syncSeed = 0;
+  let videoPlayOrder = [];
+  let currentVideoIndex = 0;
   let composure = 100;
   let blinks = 0;
   let talks = 0;
@@ -170,6 +210,7 @@ function escapeHTML(str) {
   });
 }
 
+  function getAudioContext() {
     if (!audioCtx) {
       const AudioCtx = window.AudioContext || window.webkitAudioContext;
       if (AudioCtx) audioCtx = new AudioCtx();
@@ -251,6 +292,84 @@ function escapeHTML(str) {
       gain.connect(ctx.destination);
       osc.start();
       osc.stop(ctx.currentTime + 0.65);
+    } catch (e) {}
+  }
+
+  // --- 8-BIT RETRO SFX AUDIO SYNTHESIZER ---
+  function play8BitSound(type) {
+    const ctx = getAudioContext();
+    if (!ctx) return;
+    try {
+      const now = ctx.currentTime;
+      if (type === "blink") {
+        // High-pitched blip
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = "square";
+        osc.frequency.setValueAtTime(440, now);
+        osc.frequency.exponentialRampToValueAtTime(880, now + 0.08);
+        gain.gain.setValueAtTime(0.12, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.08);
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start(now);
+        osc.stop(now + 0.08);
+      } else if (type === "flinch") {
+        // Low distorted buzz
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = "sawtooth";
+        osc.frequency.setValueAtTime(160, now);
+        osc.frequency.linearRampToValueAtTime(70, now + 0.22);
+        gain.gain.setValueAtTime(0.25, now);
+        gain.gain.exponentialRampToValueAtTime(0.01, now + 0.22);
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start(now);
+        osc.stop(now + 0.22);
+      } else if (type === "countdown") {
+        // Retro coin / pip
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = "triangle";
+        osc.frequency.setValueAtTime(587.33, now); // D5
+        gain.gain.setValueAtTime(0.15, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.12);
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start(now);
+        osc.stop(now + 0.12);
+      } else if (type === "victory") {
+        // 8-bit celebratory arpeggio
+        const notes = [261.63, 329.63, 392.00, 523.25]; // C4, E4, G4, C5
+        notes.forEach((freq, idx) => {
+          const osc = ctx.createOscillator();
+          const gain = ctx.createGain();
+          osc.type = "square";
+          osc.frequency.setValueAtTime(freq, now + idx * 0.1);
+          gain.gain.setValueAtTime(0.12, now + idx * 0.1);
+          gain.gain.exponentialRampToValueAtTime(0.001, now + idx * 0.1 + 0.2);
+          osc.connect(gain);
+          gain.connect(ctx.destination);
+          osc.start(now + idx * 0.1);
+          osc.stop(now + idx * 0.1 + 0.2);
+        });
+      } else if (type === "gameover") {
+        // 8-bit failure descend
+        const notes = [311.13, 293.66, 277.18, 261.63];
+        notes.forEach((freq, idx) => {
+          const osc = ctx.createOscillator();
+          const gain = ctx.createGain();
+          osc.type = "sawtooth";
+          osc.frequency.setValueAtTime(freq, now + idx * 0.14);
+          gain.gain.setValueAtTime(0.2, now + idx * 0.14);
+          gain.gain.exponentialRampToValueAtTime(0.01, now + idx * 0.14 + 0.22);
+          osc.connect(gain);
+          gain.connect(ctx.destination);
+          osc.start(now + idx * 0.14);
+          osc.stop(now + idx * 0.14 + 0.22);
+        });
+      }
     } catch (e) {}
   }
 
@@ -394,6 +513,7 @@ function escapeHTML(str) {
             const pen = isScare ? 15 : 4;
             blinks += 1;
             composure = Math.max(0, composure - pen);
+            play8BitSound("flinch");
             showAlert(isScare ? "📷 POST-SCARE FLINCH -" + pen : "📷 FLINCH DETECTED -" + pen);
             refreshArenaHud(Math.max(0, roundEndMs - Date.now()));
             if (composure <= 0) window.endRound(true);
@@ -427,13 +547,13 @@ function escapeHTML(str) {
     }
     if (videoPackReady) {
       if (assetBannerEl) assetBannerEl.classList.add("ready");
-      if (assetBannerTitleEl) assetBannerTitleEl.textContent = "Video Pack Ready (8/8 Clips Cached)";
+      if (assetBannerTitleEl) assetBannerTitleEl.textContent = "✅ Video Pack Ready (8/8 Clips Cached)";
       if (assetBannerDescEl) {
-        assetBannerDescEl.textContent = statusText || "All distraction YouTube Reel clips for Level 3 ('Why So Serious?') are ready in 9:16 vertical format.";
+        assetBannerDescEl.textContent = statusText || "All distraction YouTube Reel clips for Level 3 ('Why So Serious?') are cached & ready in 9:16 vertical format. Play anytime without re-downloading.";
       }
       if (btnDownloadAssetsEl) {
         btnDownloadAssetsEl.disabled = false;
-        btnDownloadAssetsEl.textContent = "Video Pack Ready (Re-verify)";
+        btnDownloadAssetsEl.textContent = "✅ Video Pack Installed (Re-verify)";
       }
     } else {
       if (assetBannerEl) assetBannerEl.classList.remove("ready");
@@ -448,6 +568,24 @@ function escapeHTML(str) {
     }
   }
 
+  async function restoreCachedBlobs() {
+    if (!('caches' in window)) return;
+    try {
+      const cache = await caches.open("flinch-distractions-v1");
+      for (let i = 0; i < DISTRACTION_FILES.length; i++) {
+        if (!cachedBlobUrls[i]) {
+          const match = await cache.match(DISTRACTION_FILES[i]);
+          if (match) {
+            const blob = await match.blob();
+            cachedBlobUrls[i] = URL.createObjectURL(blob);
+          }
+        }
+      }
+    } catch (e) {
+      console.warn("[asset-pack] restore cache error:", e);
+    }
+  }
+
   window.downloadVideoPack = async function () {
     if (videoPackDownloading) return;
     videoPackDownloading = true;
@@ -455,11 +593,25 @@ function escapeHTML(str) {
     let loadedFiles = 0;
     updateAssetBannerUi(5, "Downloading 8 vertical distraction reels (~26.8 MB)...");
 
+    let cache = null;
+    if ('caches' in window) {
+      try { cache = await caches.open("flinch-distractions-v1"); } catch (e) {}
+    }
+
     for (let i = 0; i < DISTRACTION_FILES.length; i++) {
       const url = DISTRACTION_FILES[i];
       try {
-        const resp = await fetch(url, { cache: "default" });
-        if (!resp.ok) throw new Error("HTTP " + resp.status);
+        let resp = null;
+        if (cache) {
+          resp = await cache.match(url);
+        }
+        if (!resp) {
+          resp = await fetch(url, { cache: "default" });
+          if (!resp.ok) throw new Error("HTTP " + resp.status);
+          if (cache) {
+            try { await cache.put(url, resp.clone()); } catch (ce) {}
+          }
+        }
         const blob = await resp.blob();
         totalBytes += blob.size;
         cachedBlobUrls[i] = URL.createObjectURL(blob);
@@ -474,31 +626,90 @@ function escapeHTML(str) {
 
     videoPackDownloading = false;
     videoPackReady = loadedFiles >= 1;
+    if (videoPackReady) {
+      try { localStorage.setItem(STORAGE_KEY_ASSET_PACK, "true"); } catch (e) {}
+    }
     const mbDone = (totalBytes / (1024 * 1024)).toFixed(1);
     updateAssetBannerUi(
       videoPackReady ? 100 : 0,
       videoPackReady
-        ? "Ready: " + loadedFiles + "/" + DISTRACTION_FILES.length + " reels loaded (" + mbDone + " MB). Level 3 unlocked."
+        ? "Video pack ready: " + loadedFiles + "/" + DISTRACTION_FILES.length + " reels cached permanently (" + mbDone + " MB). Level 3 unlocked."
         : "Could not pre-download video pack. Use Level 2 ('Seriously?') or try again."
     );
   };
 
-  function playRandomLevel3Clip() {
+  function generateVideoOrder(seed) {
+    const arr = Array.from({ length: DISTRACTION_FILES.length }, (_, i) => i);
+    let s = Number(seed) || 12345;
+    for (let i = arr.length - 1; i > 0; i--) {
+      s = (s * 9301 + 49297) % 233280;
+      const rnd = s / 233280;
+      const j = Math.floor(rnd * (i + 1));
+      const temp = arr[i];
+      arr[i] = arr[j];
+      arr[j] = temp;
+    }
+    return arr;
+  }
+
+  let reelTransitioning = false;
+
+  function playNextLevel3Clip() {
     if (!reelVideoEl || !reelStageBoxEl) return;
-    const idx = Math.floor(Math.random() * DISTRACTION_FILES.length);
+    if (currentLevel !== 3) {
+      stopLevel3Reel();
+      return;
+    }
+    if (!videoPlayOrder || videoPlayOrder.length === 0) {
+      videoPlayOrder = generateVideoOrder(syncSeed || Date.now());
+      currentVideoIndex = 0;
+    }
+    if (currentVideoIndex >= videoPlayOrder.length) {
+      videoPlayOrder = generateVideoOrder((syncSeed || Date.now()) + currentVideoIndex + 1);
+      currentVideoIndex = 0;
+    }
+    const idx = videoPlayOrder[currentVideoIndex];
+    currentVideoIndex++;
     const src = cachedBlobUrls[idx] || DISTRACTION_FILES[idx];
+
     if (videoCaptionEl) {
       videoCaptionEl.textContent = "Reel #" + (idx + 1) + " of " + DISTRACTION_FILES.length + " · Keep composure!";
     }
+
+    try {
+      reelVideoEl.pause();
+    } catch (e) {}
+
+    reelTransitioning = false;
+    reelVideoEl.setAttribute("playsinline", "true");
+    reelVideoEl.setAttribute("webkit-playsinline", "true");
     reelVideoEl.src = src;
-    reelVideoEl.muted = false;
-    reelVideoEl.play().catch(() => {
-      reelVideoEl.muted = true;
-      reelVideoEl.play().catch(() => {
-        if (stageStatusEl) stageStatusEl.textContent = "Tap play on YouTube Reel or switch to Level 2.";
-      });
-    });
+    reelVideoEl.currentTime = 0;
+
+    const tryPlay = () => {
+      const p = reelVideoEl.play();
+      if (p !== undefined) {
+        p.catch(() => {
+          reelVideoEl.muted = true;
+          reelVideoEl.play().catch(() => {
+            if (stageStatusEl) stageStatusEl.textContent = "Tap video or play button to start Reel!";
+          });
+        });
+      }
+    };
+
+    if (reelVideoEl.readyState >= 2) {
+      tryPlay();
+    } else {
+      const onCanPlay = () => {
+        reelVideoEl.removeEventListener("canplay", onCanPlay);
+        tryPlay();
+      };
+      reelVideoEl.addEventListener("canplay", onCanPlay, { once: true });
+      reelVideoEl.load();
+    }
   }
+
 
   function stopLevel3Reel() {
     if (reelVideoEl) {
@@ -511,6 +722,21 @@ function escapeHTML(str) {
   }
 
   if (reelVideoEl) {
+    reelVideoEl.addEventListener("ended", () => {
+      if (currentLevel === 3 && roundRunning) {
+        playNextLevel3Clip();
+      }
+    });
+
+    reelVideoEl.addEventListener("timeupdate", () => {
+      if (currentLevel === 3 && roundRunning && reelVideoEl.duration > 1) {
+        if (!reelTransitioning && reelVideoEl.currentTime >= reelVideoEl.duration - 0.3) {
+          reelTransitioning = true;
+          playNextLevel3Clip();
+        }
+      }
+    });
+
     reelVideoEl.addEventListener("error", () => {
       if (currentLevel === 3 && roundRunning) {
         videoErrorCount++;
@@ -522,7 +748,7 @@ function escapeHTML(str) {
           showAlert("LEVEL 2 FALLBACK");
         } else {
           setTimeout(() => {
-            if (currentLevel === 3 && roundRunning) playRandomLevel3Clip();
+            if (currentLevel === 3 && roundRunning) playNextLevel3Clip();
           }, 1000);
         }
       }
@@ -609,22 +835,16 @@ function escapeHTML(str) {
     const list = Array.isArray(rooms) ? rooms : [];
     if (roomCountEl) roomCountEl.textContent = list.length + " active";
     if (list.length === 0) {
-      roomListEl.innerHTML = '<div class="muted">No active rooms available. Create one as Room Master.</div>';;
+      roomListEl.innerHTML = '<div class="muted">No active rooms available. Create one as Room Master.</div>';
       return;
     }
     roomListEl.innerHTML = list.map(r => {
-        const code = escapeHTML(r.code || r.roomCode || "");
-        const hostName = escapeHTML(r.host || r.hostName || "Room Master");
-        return `<div class="room-item">
-          <div><strong>${code}</strong> <span class="muted">· Host: ${hostName}</span></div>
-          <button type="button" class="btn btn-m2" onclick="window.joinWithCode('${code}')">Join</button>
-        </div>`;
-      }).join("");
-      const code = r.code || r.roomCode || "";
-      const hostName = r.host || r.hostName || "Room Master";
+      const code = escapeHTML(r.code || r.roomCode || "");
+      const hostName = escapeHTML(r.host || r.hostName || "Room Master");
+      const safeCode = String(r.code || r.roomCode || "").replace(/[^a-zA-Z0-9_-]/g, "");
       return '<div class="room-item">' +
-        '<div><strong>' + code + '</strong> <span class="muted">· Host: ' + hostName + '</span></div>' +
-        '<button type="button" class="btn btn-m2" onclick="window.joinWithCode(\'' + code + '\')">Join</button>' +
+        '<div><strong>' + escapeHTML(safeCode) + '</strong> <span class="muted">· Host: ' + hostName + '</span></div>' +
+        '<button type="button" class="btn btn-m2" data-room="' + escapeHTML(safeCode) + '" onclick="window.joinWithCode(this.getAttribute(\'data-room\'))">Join</button>' +
         '</div>';
     }).join("");
   }
@@ -641,14 +861,14 @@ function escapeHTML(str) {
       const badge = p.role === "host"
         ? '<span class="badge-master">👑 ROOM MASTER</span>'
         : '<span class="badge-guest">🎮 PLAYER</span>';
-      return '<div class="player-item"><strong>' + (p.name || "Player") + '</strong>' + badge + '</div>';
+      return '<div class="player-item"><strong>' + escapeHTML(p.name || "Player") + '</strong>' + badge + '</div>';
     }).join("");
   }
 
   function renderScoreboard() {
     if (!scoreboardRowsEl) return;
     if (!Array.isArray(scores) || scores.length === 0) {
-      scoreboardRowsEl.innerHTML = '<div class="muted">No match results recorded yet.</div>';
+      scoreboardRowsEl.innerHTML = '<div class="muted">No match results recorded yet. Complete a round in the Arena!</div>';
       return;
     }
     const sorted = [...scores].sort((a, b) => (b.score || 0) - (a.score || 0));
@@ -656,22 +876,56 @@ function escapeHTML(str) {
       const tag = s.role === "host"
         ? '<span class="badge-master">👑 ROOM MASTER</span>'
         : '<span class="badge-guest">🎮 PLAYER</span>';
-      return '<div class="score-item">' +
-        '<div><strong>#' + (i + 1) + ' ' + s.name + '</strong> ' + tag + ' <span class="muted">(' + s.modeName + ')</span></div>' +
-        '<strong>' + s.score + ' / 1000</strong>' +
-        '</div>';
+      const rankBadge = i === 0 ? "🥇" : i === 1 ? "🥈" : i === 2 ? "🥉" : "#" + (i + 1);
+      const datePart = s.date ? ` <span class="muted" style="font-size:11px;">· ${s.date}</span>` : "";
+      return `<div class="score-item">
+        <div><strong>${rankBadge} ${escapeHTML(s.name)}</strong> ${tag} <span class="muted">(${escapeHTML(s.modeName)})</span>${datePart}</div>
+        <strong style="color:var(--green);font-size:15px;letter-spacing:0.5px;">${s.score} / 1000</strong>
+      </div>`;
     }).join("");
   }
 
   function recordScore(name, pts, r) {
+    if (!name || !name.trim()) return;
     const modeName = (MODE_META[currentLevel] && MODE_META[currentLevel].name) || "Chill Mode";
     const clamped = Math.max(0, Math.min(1000, Math.round(pts)));
-    const idx = scores.findIndex(item => item.name === name);
-    const entry = { name, score: clamped, role: r || role, modeName };
-    if (idx >= 0) scores[idx] = entry;
-    else scores.push(entry);
+    const dateStr = new Date().toLocaleDateString(undefined, { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" });
+    const idx = scores.findIndex(item => item.name === name && item.modeName === modeName);
+    const entry = { name, score: clamped, role: r || role, modeName, date: dateStr };
+    if (idx >= 0) {
+      if (clamped >= (scores[idx].score || 0)) {
+        scores[idx] = entry;
+      }
+    } else {
+      scores.push(entry);
+    }
+    saveStoredScores();
     renderScoreboard();
+
+    // Persist to Leaderboard backend database
+    if (clamped > 0) {
+      try {
+        fetch("api_leaderboard.php?action=submit", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            name: name,
+            score: clamped,
+            modeId: currentLevel,
+            modeName: modeName,
+            role: r || role
+          })
+        }).catch(err => console.warn("Leaderboard sync warning:", err));
+      } catch (e) {}
+    }
   }
+
+  window.clearScoreboard = function () {
+    scores = [];
+    saveStoredScores();
+    renderScoreboard();
+    showAlert("LEADERBOARD CLEARED");
+  };
 
   function refreshArenaHud(remainingMs) {
     const secLeft = Math.max(0, Math.ceil(remainingMs / 1000));
@@ -804,7 +1058,7 @@ function escapeHTML(str) {
     rafId = requestAnimationFrame(stepRound);
   }
 
-  async function startRound(level, sec) {
+  async function startRound(level, sec, seed) {
     let targetLevel = Number(level) || 1;
     if (targetLevel === 3 && !videoPackReady && !cachedBlobUrls.length) {
       updateAssetBannerUi(0, "Level 3 video pack (~26.8 MB) is not downloaded yet. Download it first or play Level 2.");
@@ -812,6 +1066,9 @@ function escapeHTML(str) {
 
     currentLevel = targetLevel;
     durationSec = Number(sec) || 30;
+    syncSeed = Number(seed) || Math.floor(Math.random() * 1000000);
+    videoPlayOrder = generateVideoOrder(syncSeed);
+    currentVideoIndex = 0;
     videoErrorCount = 0;
     const meta = MODE_META[currentLevel] || MODE_META[1];
 
@@ -823,20 +1080,23 @@ function escapeHTML(str) {
     // Sizing & layout for games:
     // Level 3 displays vertical reel alongside live camera tracker
     // Levels 1, 2, 4 display camera tracker centered on stage
-    if (currentLevel === 3) {
-      if (arenaStageEl) arenaStageEl.className = "stage level3-active";
-      if (reelStageBoxEl) reelStageBoxEl.style.display = "flex";
-      playRandomLevel3Clip();
-    } else {
-      if (arenaStageEl) arenaStageEl.className = "stage";
-      stopLevel3Reel();
-    }
-
     // Ensure camera is active and asking for permission
     await window.ensureCameraActive();
 
     if (rafId) cancelAnimationFrame(rafId);
     roundRunning = true;
+
+    // Sizing & layout for games:
+    // Level 3 displays vertical reel alongside live camera tracker
+    // Levels 1, 2, 4 display camera tracker centered on stage
+    if (currentLevel === 3) {
+      if (arenaStageEl) arenaStageEl.className = "stage level3-active";
+      if (reelStageBoxEl) reelStageBoxEl.style.display = "flex";
+      playNextLevel3Clip();
+    } else {
+      if (arenaStageEl) arenaStageEl.className = "stage";
+      stopLevel3Reel();
+    }
     composure = 100;
     blinks = 0;
     talks = 0;
@@ -852,24 +1112,71 @@ function escapeHTML(str) {
 
     refreshArenaHud(durationSec * 1000);
     window.setTab("arena");
+
+    // Scroll smoothly to the Game Arena and lock scrolling during the round
+    document.body.classList.add("game-active");
+    if (arenaStageEl) {
+      arenaStageEl.scrollIntoView({ behavior: "smooth", block: "center" });
+    } else {
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    }
+
     rafId = requestAnimationFrame(stepRound);
   }
 
+  function ensurePlayerName() {
+    const nameEl = document.getElementById("input-name");
+    const val = (nameEl && nameEl.value.trim()) || playerName.trim();
+    if (val) {
+      playerName = val;
+      try { localStorage.setItem(STORAGE_KEY_PLAYER_NAME, val); } catch (e) {}
+      if (nameEl) {
+        nameEl.value = val;
+        nameEl.style.borderColor = "";
+      }
+      return val;
+    }
+
+    // Politely prompt the user and guide them to the input field
+    window.setTab("lobby");
+    if (nameEl) {
+      nameEl.focus();
+      nameEl.style.borderColor = "var(--coral)";
+      nameEl.style.boxShadow = "0 0 12px rgba(255, 75, 75, 0.7)";
+      setTimeout(() => {
+        if (nameEl) nameEl.style.boxShadow = "";
+      }, 3000);
+    }
+    if (lobbyMsgEl) {
+      lobbyMsgEl.textContent = "👋 Welcome! Please enter your gamer name first to continue.";
+    }
+    showAlert("ENTER YOUR NAME");
+    return "";
+  }
+
   window.selectAndLaunchMode = async function (level) {
+    const validName = ensurePlayerName();
+    if (!validName) return;
     const durEl = document.getElementById("select-duration");
     const dur = durEl ? Number(durEl.value) : 30;
-    if (Number(level) === 3 && !videoPackReady) {
-      window.setTab("lobby");
-      updateAssetBannerUi(0, "Please click 'Download Video Pack (~26.8 MB)' above before launching Level 3, or choose Level 2.");
-      if (assetBannerEl && assetBannerEl.scrollIntoView) {
-        assetBannerEl.scrollIntoView({ behavior: "smooth", block: "center" });
+    const targetLvl = Number(level);
+
+    if (targetLvl === 3 && !videoPackReady) {
+      if (checkStoredAssetPackReady()) {
+        videoPackReady = true;
+      } else {
+        // Automatically unlock and stream directly from server assets
+        videoPackReady = true;
+        try { localStorage.setItem(STORAGE_KEY_ASSET_PACK, "true"); } catch (e) {}
+        updateAssetBannerUi(100, "Level 3 unlocked. Streaming distraction reels directly from server.");
       }
-      return;
     }
-    await startRound(level, dur);
+    await startRound(targetLvl, dur);
   };
 
   window.startSoloNow = async function () {
+    const validName = ensurePlayerName();
+    if (!validName) return;
     await startRound(currentLevel, durationSec);
   };
 
@@ -877,6 +1184,7 @@ function escapeHTML(str) {
     if (!roundRunning) return;
     const pen = Date.now() < postScareUntilMs ? 15 : 4;
     blinks += 1;
+    play8BitSound("blink");
     composure = Math.max(0, composure - pen);
     showAlert(pen === 15 ? "POST-SCARE -" + pen : "MANUAL BLINK -" + pen);
     refreshArenaHud(Math.max(0, roundEndMs - Date.now()));
@@ -908,6 +1216,8 @@ function escapeHTML(str) {
 
   window.endRound = function (submit) {
     roundRunning = false;
+    // Release scroll lock immediately when round terminates
+    document.body.classList.remove("game-active");
     if (rafId) { cancelAnimationFrame(rafId); rafId = null; }
     if (jumpscareLayerEl) jumpscareLayerEl.classList.remove("active");
     stopLevel3Reel();
@@ -926,16 +1236,16 @@ function escapeHTML(str) {
   };
 
   window.createRoom = function () {
-    const nameEl = document.getElementById("input-name");
+    const validName = ensurePlayerName();
+    if (!validName) return;
     const passEl = document.getElementById("input-pass");
-    playerName = (nameEl && nameEl.value.trim()) || "Jack";
     if (!socket || !socket.connected) {
       if (lobbyMsgEl) lobbyMsgEl.textContent = "Connecting to server... try again in a moment.";
       return;
     }
     socket.emit("create_room", {
-      name: playerName,
-      hostName: playerName,
+      name: validName,
+      hostName: validName,
       password: passEl ? passEl.value.trim() : ""
     });
   };
@@ -947,10 +1257,10 @@ function escapeHTML(str) {
   };
 
   window.joinRoom = function () {
-    const nameEl = document.getElementById("input-name");
+    const validName = ensurePlayerName();
+    if (!validName) return;
     const codeEl = document.getElementById("input-code");
     const passEl = document.getElementById("input-pass");
-    playerName = (nameEl && nameEl.value.trim()) || "Jack";
     const code = (codeEl && codeEl.value.trim().toUpperCase()) || "";
     if (!code) {
       if (lobbyMsgEl) lobbyMsgEl.textContent = "Enter a room code or pick a room from Active Rooms.";
@@ -962,7 +1272,7 @@ function escapeHTML(str) {
     }
     socket.emit("join_room", {
       code,
-      name: playerName,
+      name: validName,
       password: passEl ? passEl.value.trim() : ""
     }, (res) => {
       if (res && res.success === false && lobbyMsgEl) {
@@ -989,6 +1299,8 @@ function escapeHTML(str) {
   };
 
   window.startMultiplayerRound = function () {
+    const validName = ensurePlayerName();
+    if (!validName) return;
     if (!roomCode || role !== "host") {
       if (lobbyMsgEl) lobbyMsgEl.textContent = "Only the 👑 ROOM MASTER can start the multiplayer round.";
       return;
@@ -1000,8 +1312,11 @@ function escapeHTML(str) {
     }
     const durEl = document.getElementById("select-duration");
     const dur = durEl ? Number(durEl.value) : 30;
+    const modeEl = document.getElementById("select-mp-mode");
+    const selectedLvl = modeEl ? Number(modeEl.value) : currentLevel;
+    const seed = Math.floor(Math.random() * 1000000);
     if (socket && socket.connected) {
-      socket.emit("start_game", { level: currentLevel, duration: dur }, (res) => {
+      socket.emit("start_game", { level: selectedLvl, duration: dur, seed: seed }, (res) => {
         if (res && res.success === false && lobbyMsgEl) {
           lobbyMsgEl.textContent = res.error || "Wait for a second player to join before starting.";
         }
@@ -1110,11 +1425,12 @@ function escapeHTML(str) {
       const delay = Math.max(0, startAt - Date.now());
       const lvl = (payload && payload.level) || currentLevel;
       const dur = (payload && payload.duration) || durationSec;
-      if (stageStatusEl) stageStatusEl.textContent = "Match starting in " + Math.ceil(delay / 1000) + "s...";
+      const seed = (payload && typeof payload.seed === "number") ? payload.seed : Date.now();
+      if (stageStatusEl) stageStatusEl.textContent = "Match starting in " + Math.ceil(delay / 1000) + "s... Mode " + lvl;
       showAlert("MATCH STARTING");
       window.ensureCameraActive();
       window.setTab("arena");
-      setTimeout(() => startRound(lvl, dur), delay);
+      setTimeout(() => startRound(lvl, dur, seed), delay);
     });
 
     socket.on("game_result", (payload) => {
@@ -1168,8 +1484,30 @@ function escapeHTML(str) {
   }
 
   window.addEventListener("DOMContentLoaded", () => {
+    const nameEl = document.getElementById("input-name");
+    if (nameEl) {
+      if (storedPlayerName) {
+        nameEl.value = storedPlayerName;
+      } else {
+        nameEl.value = "";
+      }
+      nameEl.addEventListener("input", () => {
+        const val = nameEl.value.trim();
+        playerName = val;
+        if (val) {
+          try { localStorage.setItem(STORAGE_KEY_PLAYER_NAME, val); } catch (e) {}
+          nameEl.style.borderColor = "";
+        }
+      });
+    }
     updateRoleUi();
-    updateAssetBannerUi(0);
+    if (checkStoredAssetPackReady()) {
+      videoPackReady = true;
+      updateAssetBannerUi(100, "Level 3 distraction reels are cached and ready. Play anytime without re-downloading.");
+      restoreCachedBlobs();
+    } else {
+      updateAssetBannerUi(0);
+    }
     renderRooms();
     renderPlayers();
     renderScoreboard();
@@ -1180,3 +1518,16 @@ function escapeHTML(str) {
     window.requestCameraPermission();
   });
 })();
+
+  // Prevent touchmove/wheel scroll during active game round
+  window.addEventListener("wheel", (e) => {
+    if (roundRunning && document.body.classList.contains("game-active")) {
+      e.preventDefault();
+    }
+  }, { passive: false });
+
+  window.addEventListener("touchmove", (e) => {
+    if (roundRunning && document.body.classList.contains("game-active")) {
+      e.preventDefault();
+    }
+  }, { passive: false });

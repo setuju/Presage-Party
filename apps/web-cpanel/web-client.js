@@ -385,6 +385,10 @@ function escapeHTML(str) {
   }
 
   window.setTab = function (tabId) {
+    if (tabId === "arena" && (!playerName || !playerName.trim())) {
+      const valid = ensurePlayerName(true);
+      if (!valid) return;
+    }
     document.querySelectorAll(".tab").forEach(btn => {
       btn.classList.toggle("active", btn.getAttribute("data-tab") === tabId);
     });
@@ -396,6 +400,8 @@ function escapeHTML(str) {
 
     if (tabId === "arena") {
       window.ensureCameraActive();
+    } else if (tabId === "scoreboard") {
+      window.refreshLeaderboards(false);
     }
   };
 
@@ -865,6 +871,217 @@ function escapeHTML(str) {
     }).join("");
   }
 
+  let cachedLeaderboards = null;
+  let currentLbDivision = "total"; // "total", 1, 2, 3, 4
+
+  const LB_INFO = {
+    "total": {
+      title: "👑 Overall Championship: Total Game Played & Master Score",
+      desc: "Cumulative composure points across all played modes. Proves total mastery.",
+      empty: "No cumulative scores recorded yet. Compete across all 4 modes!"
+    },
+    1: {
+      title: "🟢 Level 1: Chill Mode Division",
+      desc: "Baseline composure test without active distraction cues. Maximum score: 1000.",
+      empty: "No contenders for Chill Mode yet. Play round 1 to stake your claim!"
+    },
+    2: {
+      title: "🟡 Level 2: Seriously? Division",
+      desc: "Audio & text voice distractions active. Maximum score: 1000.",
+      empty: "No contenders for Level 2 yet. Resist the audio cues and survive!"
+    },
+    3: {
+      title: "🔴 Level 3: Why So Serious? Division",
+      desc: "Vertical Viral Reels challenge with optical flinch tracking. Maximum score: 1000.",
+      empty: "No contenders for Level 3 yet. Download asset pack & hold your face steady!"
+    },
+    4: {
+      title: "🔥 Level 4: Don't Scream Division",
+      desc: "Jumpscare spikes with brutal post-scare composure penalties (-15). Maximum score: 1000.",
+      empty: "No brave souls recorded for Don't Scream yet. Step into the arena if you dare!"
+    }
+  };
+
+  async function fetchGlobalLeaderboards(showFeedback = false) {
+    const statusEl = document.getElementById("lb-sync-status");
+    if (statusEl && showFeedback) statusEl.textContent = "Syncing...";
+    try {
+      const res = await fetch("api_leaderboard.php?action=get", { cache: "no-store" });
+      if (!res.ok) throw new Error("HTTP " + res.status);
+      const json = await res.json();
+      if (json && json.ok) {
+        cachedLeaderboards = json;
+        renderGlobalLeaderboard();
+        if (statusEl) statusEl.textContent = "Synced: " + new Date().toLocaleTimeString();
+        return;
+      }
+    } catch (e) {
+      console.warn("Could not fetch leaderboards from API:", e);
+      if (statusEl) statusEl.textContent = "Offline (local)";
+    }
+  }
+
+  function renderGlobalLeaderboard() {
+    const titleEl = document.getElementById("lb-division-title");
+    const descEl = document.getElementById("lb-division-desc");
+    const theadEl = document.getElementById("lb-table-head");
+    const tbodyEl = document.getElementById("lb-table-body");
+    if (!tbodyEl) return;
+
+    const info = LB_INFO[currentLbDivision] || LB_INFO["total"];
+    if (titleEl) titleEl.textContent = info.title;
+    if (descEl) descEl.textContent = info.desc;
+
+    if (!cachedLeaderboards) {
+      tbodyEl.innerHTML = '<tr><td colspan="5" style="text-align:center;padding:20px;" class="muted">Loading live leaderboard data...</td></tr>';
+      return;
+    }
+
+    const isTotal = currentLbDivision === "total";
+    if (isTotal) {
+      if (theadEl) {
+        theadEl.innerHTML = `<tr>
+          <th style="width:60px;">Rank</th>
+          <th>Master Player</th>
+          <th>Modes Conquered</th>
+          <th class="text-right">Peak Score</th>
+          <th class="text-right">Total Score</th>
+        </tr>`;
+      }
+      const list = cachedLeaderboards.total || [];
+      renderLbPodium(list, true);
+
+      if (list.length === 0) {
+        tbodyEl.innerHTML = `<tr><td colspan="5" style="text-align:center;padding:20px;" class="muted">${escapeHTML(info.empty)}</td></tr>`;
+        return;
+      }
+
+      tbodyEl.innerHTML = list.map((item, idx) => {
+        const rank = idx + 1;
+        const rankClass = rank === 1 ? "rank-1" : rank === 2 ? "rank-2" : rank === 3 ? "rank-3" : "";
+        const rankIcon = rank === 1 ? "🥇" : rank === 2 ? "🥈" : rank === 3 ? "🥉" : "#" + rank;
+        return `<tr class="row-item">
+          <td class="rank-cell ${rankClass}">${rankIcon}</td>
+          <td>
+            <div style="font-weight:700;display:flex;align-items:center;gap:8px;">
+              <span>${escapeHTML(item.name)}</span>
+              <span class="badge-master" style="font-size:12px;padding:2px 6px;">CHAMPION</span>
+            </div>
+          </td>
+          <td class="muted">${item.modes_beaten} / 4 Modes</td>
+          <td class="score-cell text-right" style="color:var(--blue);">${item.best_score} pts</td>
+          <td class="score-cell score-total text-right">${item.total_score} pts</td>
+        </tr>`;
+      }).join("");
+
+    } else {
+      if (theadEl) {
+        theadEl.innerHTML = `<tr>
+          <th style="width:60px;">Rank</th>
+          <th>Player</th>
+          <th>Role</th>
+          <th class="text-right">Composure Score</th>
+          <th class="text-right">Recorded</th>
+        </tr>`;
+      }
+      const key = "mode_" + currentLbDivision;
+      const list = cachedLeaderboards[key] || [];
+      renderLbPodium(list, false);
+
+      if (list.length === 0) {
+        tbodyEl.innerHTML = `<tr><td colspan="5" style="text-align:center;padding:20px;" class="muted">${escapeHTML(info.empty)}</td></tr>`;
+        return;
+      }
+
+      tbodyEl.innerHTML = list.map((item, idx) => {
+        const rank = idx + 1;
+        const rankClass = rank === 1 ? "rank-1" : rank === 2 ? "rank-2" : rank === 3 ? "rank-3" : "";
+        const rankIcon = rank === 1 ? "🥇" : rank === 2 ? "🥈" : rank === 3 ? "🥉" : "#" + rank;
+        const tag = item.role === "host"
+          ? '<span class="badge-master" style="font-size:11px;padding:2px 6px;">👑 HOST</span>'
+          : (item.role === "guest"
+            ? '<span class="badge-guest" style="font-size:11px;padding:2px 6px;">🎮 GUEST</span>'
+            : '<span class="badge" style="font-size:11px;padding:2px 6px;background:#e9d5ff;color:#6b21a8;">⚡ SOLO</span>');
+        const dateStr = item.created_at ? item.created_at.replace("T", " ").substring(0, 16) : "-";
+
+        return `<tr class="row-item">
+          <td class="rank-cell ${rankClass}">${rankIcon}</td>
+          <td><strong style="font-size:15px;">${escapeHTML(item.name)}</strong></td>
+          <td>${tag}</td>
+          <td class="score-cell text-right">${item.score} / 1000</td>
+          <td class="date-cell text-right">${escapeHTML(dateStr)}</td>
+        </tr>`;
+      }).join("");
+    }
+  }
+
+  function renderLbPodium(list, isTotal) {
+    const podiumEl = document.getElementById("lb-podium");
+    if (!podiumEl) return;
+    if (!list || list.length < 3) {
+      podiumEl.style.display = "none";
+      return;
+    }
+    podiumEl.style.display = "grid";
+    const p1 = list[0];
+    const p2 = list[1];
+    const p3 = list[2];
+    const score1 = isTotal ? p1.total_score + " pts" : p1.score + " / 1000";
+    const score2 = isTotal ? p2.total_score + " pts" : p2.score + " / 1000";
+    const score3 = isTotal ? p3.total_score + " pts" : p3.score + " / 1000";
+
+    podiumEl.innerHTML = `
+      <div class="podium-card second">
+        <div class="podium-rank">🥈</div>
+        <div class="podium-name">${escapeHTML(p2.name)}</div>
+        <div class="podium-score" style="color:#94a3b8;">${score2}</div>
+      </div>
+      <div class="podium-card first">
+        <div class="podium-rank">👑 🥇</div>
+        <div class="podium-name">${escapeHTML(p1.name)}</div>
+        <div class="podium-score" style="color:#f59e0b;">${score1}</div>
+      </div>
+      <div class="podium-card third">
+        <div class="podium-rank">🥉</div>
+        <div class="podium-name">${escapeHTML(p3.name)}</div>
+        <div class="podium-score" style="color:#d97706;">${score3}</div>
+      </div>
+    `;
+  }
+
+  window.switchLbDivision = function (id) {
+    currentLbDivision = (id === "total" || id === 5) ? "total" : Number(id);
+    document.querySelectorAll(".lb-tab-btn").forEach(btn => {
+      const bAttr = btn.getAttribute("data-lb");
+      const match = String(bAttr) === String(currentLbDivision);
+      btn.classList.toggle("active", match);
+      if (match) btn.classList.add("btn-m2");
+      else btn.classList.remove("btn-m2");
+    });
+    renderGlobalLeaderboard();
+  };
+
+  window.refreshLeaderboards = function (userClick = false, switchDivision = null) {
+    if (switchDivision !== null) {
+      currentLbDivision = (switchDivision === "total" || switchDivision === 5) ? "total" : Number(switchDivision);
+      document.querySelectorAll(".lb-tab-btn").forEach(btn => {
+        const bAttr = btn.getAttribute("data-lb");
+        const match = String(bAttr) === String(currentLbDivision);
+        btn.classList.toggle("active", match);
+        if (match) btn.classList.add("btn-m2");
+        else btn.classList.remove("btn-m2");
+      });
+    }
+    fetchGlobalLeaderboards(userClick);
+  };
+
+  window.clearMyScores = function () {
+    scores = [];
+    saveStoredScores();
+    renderScoreboard();
+    showAlert("HISTORY CLEARED");
+  };
+
   function renderScoreboard() {
     if (!scoreboardRowsEl) return;
     if (!Array.isArray(scores) || scores.length === 0) {
@@ -875,7 +1092,9 @@ function escapeHTML(str) {
     scoreboardRowsEl.innerHTML = sorted.map((s, i) => {
       const tag = s.role === "host"
         ? '<span class="badge-master">👑 ROOM MASTER</span>'
-        : '<span class="badge-guest">🎮 PLAYER</span>';
+        : (s.role === "guest"
+          ? '<span class="badge-guest">🎮 PLAYER</span>'
+          : '<span class="badge-master" style="background:#e9d5ff;color:#6b21a8;">⚡ SOLO</span>');
       const rankBadge = i === 0 ? "🥇" : i === 1 ? "🥈" : i === 2 ? "🥉" : "#" + (i + 1);
       const datePart = s.date ? ` <span class="muted" style="font-size:11px;">· ${s.date}</span>` : "";
       return `<div class="score-item">
@@ -885,13 +1104,14 @@ function escapeHTML(str) {
     }).join("");
   }
 
-  function recordScore(name, pts, r) {
+  function recordScore(name, pts, r, explicitLevel) {
     if (!name || !name.trim()) return;
-    const modeName = (MODE_META[currentLevel] && MODE_META[currentLevel].name) || "Chill Mode";
+    const targetLevel = Number(explicitLevel) || currentLevel || 1;
+    const modeName = (MODE_META[targetLevel] && MODE_META[targetLevel].name) || "Chill Mode";
     const clamped = Math.max(0, Math.min(1000, Math.round(pts)));
     const dateStr = new Date().toLocaleDateString(undefined, { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" });
     const idx = scores.findIndex(item => item.name === name && item.modeName === modeName);
-    const entry = { name, score: clamped, role: r || role, modeName, date: dateStr };
+    const entry = { name, score: clamped, role: r || role, modeName, modeId: targetLevel, date: dateStr };
     if (idx >= 0) {
       if (clamped >= (scores[idx].score || 0)) {
         scores[idx] = entry;
@@ -902,7 +1122,7 @@ function escapeHTML(str) {
     saveStoredScores();
     renderScoreboard();
 
-    // Persist to Leaderboard backend database
+    // Persist to Leaderboard backend database with exact modeId and modeName
     if (clamped > 0) {
       try {
         fetch("api_leaderboard.php?action=submit", {
@@ -911,10 +1131,12 @@ function escapeHTML(str) {
           body: JSON.stringify({
             name: name,
             score: clamped,
-            modeId: currentLevel,
+            modeId: targetLevel,
             modeName: modeName,
             role: r || role
           })
+        }).then(() => {
+          window.refreshLeaderboards(false, targetLevel);
         }).catch(err => console.warn("Leaderboard sync warning:", err));
       } catch (e) {}
     }
@@ -1059,6 +1281,14 @@ function escapeHTML(str) {
   }
 
   async function startRound(level, sec, seed) {
+    const validName = ensurePlayerName(true);
+    if (!validName) {
+      showAlert("NAME REQUIRED");
+      window.setTab("lobby");
+      return;
+    }
+    playerName = validName;
+
     let targetLevel = Number(level) || 1;
     if (targetLevel === 3 && !videoPackReady && !cachedBlobUrls.length) {
       updateAssetBannerUi(0, "Level 3 video pack (~26.8 MB) is not downloaded yet. Download it first or play Level 2.");
@@ -1124,9 +1354,16 @@ function escapeHTML(str) {
     rafId = requestAnimationFrame(stepRound);
   }
 
-  function ensurePlayerName() {
+  function ensurePlayerName(promptIfMissing = false) {
     const nameEl = document.getElementById("input-name");
-    const val = (nameEl && nameEl.value.trim()) || playerName.trim();
+    let val = (nameEl && nameEl.value.trim()) || playerName.trim();
+    if (!val && promptIfMissing) {
+      const input = window.prompt("👋 Welcome to Flinch Royale!\n\nPlease enter your gamer name before playing:");
+      if (input && input.trim()) {
+        val = input.trim();
+        if (nameEl) nameEl.value = val;
+      }
+    }
     if (val) {
       playerName = val;
       try { localStorage.setItem(STORAGE_KEY_PLAYER_NAME, val); } catch (e) {}
@@ -1142,7 +1379,7 @@ function escapeHTML(str) {
     if (nameEl) {
       nameEl.focus();
       nameEl.style.borderColor = "var(--coral)";
-      nameEl.style.boxShadow = "0 0 12px rgba(255, 75, 75, 0.7)";
+      nameEl.style.boxShadow = "0 0 14px rgba(255, 75, 75, 0.8)";
       setTimeout(() => {
         if (nameEl) nameEl.style.boxShadow = "";
       }, 3000);
@@ -1155,7 +1392,7 @@ function escapeHTML(str) {
   }
 
   window.selectAndLaunchMode = async function (level) {
-    const validName = ensurePlayerName();
+    const validName = ensurePlayerName(true);
     if (!validName) return;
     const durEl = document.getElementById("select-duration");
     const dur = durEl ? Number(durEl.value) : 30;
@@ -1175,7 +1412,7 @@ function escapeHTML(str) {
   };
 
   window.startSoloNow = async function () {
-    const validName = ensurePlayerName();
+    const validName = ensurePlayerName(true);
     if (!validName) return;
     await startRound(currentLevel, durationSec);
   };
@@ -1202,10 +1439,12 @@ function escapeHTML(str) {
 
   window.submitCurrentScore = function () {
     const finalPts = composure > 0 ? Math.round(composure * 10) : 0;
-    recordScore(playerName, finalPts, role);
+    const playedLevel = currentLevel;
+    recordScore(playerName, finalPts, role, playedLevel);
     if (socket && socket.connected) {
       socket.emit("report_score", {
         score: finalPts,
+        level: playedLevel,
         blinks,
         talks,
         rateSpikes,
@@ -1222,12 +1461,14 @@ function escapeHTML(str) {
     if (jumpscareLayerEl) jumpscareLayerEl.classList.remove("active");
     stopLevel3Reel();
     refreshArenaHud(0);
+    const playedLevel = currentLevel;
     if (stageStatusEl) {
       stageStatusEl.textContent = composure > 0
         ? "Round complete! Survived with " + Math.round(composure) + "% composure."
         : "Eliminated — composure reached 0%.";
     }
     if (submit) window.submitCurrentScore();
+    window.refreshLeaderboards(false, playedLevel);
     window.setTab("scoreboard");
   };
 
@@ -1236,7 +1477,7 @@ function escapeHTML(str) {
   };
 
   window.createRoom = function () {
-    const validName = ensurePlayerName();
+    const validName = ensurePlayerName(true);
     if (!validName) return;
     const passEl = document.getElementById("input-pass");
     if (!socket || !socket.connected) {
@@ -1257,7 +1498,7 @@ function escapeHTML(str) {
   };
 
   window.joinRoom = function () {
-    const validName = ensurePlayerName();
+    const validName = ensurePlayerName(true);
     if (!validName) return;
     const codeEl = document.getElementById("input-code");
     const passEl = document.getElementById("input-pass");
@@ -1299,7 +1540,7 @@ function escapeHTML(str) {
   };
 
   window.startMultiplayerRound = function () {
-    const validName = ensurePlayerName();
+    const validName = ensurePlayerName(true);
     if (!validName) return;
     if (!roomCode || role !== "host") {
       if (lobbyMsgEl) lobbyMsgEl.textContent = "Only the 👑 ROOM MASTER can start the multiplayer round.";
@@ -1389,7 +1630,6 @@ function escapeHTML(str) {
       players = [{ name: (data && data.hostName) || playerName, role: "host" }];
       updateRoleUi();
       renderPlayers();
-      recordScore(playerName, 0, "host");
       if (lobbyMsgEl) lobbyMsgEl.textContent = "👑 Room " + roomCode + " created. You are Room Master.";
       showAlert("ROOM " + roomCode + " CREATED");
       socket.emit("get_rooms");
@@ -1403,7 +1643,6 @@ function escapeHTML(str) {
       players.push({ name: playerName, role: "guest" });
       updateRoleUi();
       renderPlayers();
-      recordScore(playerName, 0, "guest");
       if (lobbyMsgEl) {
         lobbyMsgEl.textContent = "🎮 Joined room " + roomCode + " (Host: " + ((data && data.hostName) || "Room Master") + ").";
       }
@@ -1434,11 +1673,12 @@ function escapeHTML(str) {
     });
 
     socket.on("game_result", (payload) => {
+      const matchLevel = (payload && payload.level) || currentLevel;
       if (payload && payload.hostName && payload.host) {
-        recordScore(payload.hostName, payload.host.score || 0, "host");
+        recordScore(payload.hostName, payload.host.score || 0, "host", matchLevel);
       }
       if (payload && payload.guestName && payload.guest) {
-        recordScore(payload.guestName, payload.guest.score || 0, "guest");
+        recordScore(payload.guestName, payload.guest.score || 0, "guest", matchLevel);
       }
       const winner = payload && payload.winner;
       const winnerMsg = winner === "tie"
@@ -1446,6 +1686,7 @@ function escapeHTML(str) {
         : (winner === role ? "🏆 You won the match!" : "Match finished.");
       if (stageStatusEl) stageStatusEl.textContent = winnerMsg;
       showAlert(winnerMsg);
+      window.refreshLeaderboards(false, matchLevel);
       window.setTab("scoreboard");
     });
 
@@ -1499,6 +1740,22 @@ function escapeHTML(str) {
           nameEl.style.borderColor = "";
         }
       });
+      nameEl.addEventListener("keydown", (e) => {
+        if (e.key === "Enter") {
+          e.preventDefault();
+          const val = nameEl.value.trim();
+          if (val) {
+            playerName = val;
+            try { localStorage.setItem(STORAGE_KEY_PLAYER_NAME, val); } catch (e) {}
+            nameEl.style.borderColor = "#4ade80";
+            showAlert("HI " + val.toUpperCase() + "!");
+            if (lobbyMsgEl) lobbyMsgEl.textContent = "👋 Welcome, " + val + "! Pick a challenge mode or create a room to play.";
+          }
+        }
+      });
+      if (!storedPlayerName && lobbyMsgEl) {
+        lobbyMsgEl.textContent = "👋 Welcome to Flinch Royale! Enter your gamer name above to start playing.";
+      }
     }
     updateRoleUi();
     if (checkStoredAssetPackReady()) {
@@ -1511,6 +1768,7 @@ function escapeHTML(str) {
     renderRooms();
     renderPlayers();
     renderScoreboard();
+    fetchGlobalLeaderboards(false);
     refreshArenaHud(30000);
     window.loadReplaySample();
     connectSocket();

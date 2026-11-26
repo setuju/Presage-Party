@@ -239,17 +239,59 @@
       </div>
     </section>
 
-    <!-- TAB 3: SCOREBOARD -->
+    <!-- TAB 3: SCOREBOARD & GLOBAL LEADERBOARDS -->
     <section id="panel-scoreboard" class="panel">
       <div class="card">
         <div class="card-head">
-          <span>🏆 Scoreboard &amp; Match Results</span>
-          <div style="display:flex;gap:8px;flex-wrap:wrap;">
-            <a href="leaderboard.html" class="btn btn-secondary" style="text-decoration:none;display:inline-flex;align-items:center;background:linear-gradient(135deg, rgba(251,191,36,0.2), rgba(245,158,11,0.2));border-color:var(--amber);color:#fef08a;">👑 5-Division Leaderboard</a>
-            <button type="button" class="btn btn-primary" onclick="window.submitCurrentScore()">Submit My Score</button>
+          <span>🏆 Global Leaderboards &amp; Match Results</span>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+            <span id="lb-sync-status" class="muted" style="font-size:12px;">Synced: Just now</span>
+            <button type="button" class="btn" onclick="window.refreshLeaderboards(true)">🔄 Refresh</button>
+            <a href="leaderboard.html" class="btn btn-secondary" style="text-decoration:none;display:inline-flex;align-items:center;background:linear-gradient(135deg, rgba(251,191,36,0.2), rgba(245,158,11,0.2));border-color:var(--amber);color:#fef08a;">👑 Standings Page</a>
           </div>
         </div>
-        <div id="scoreboard-rows"><div class="muted">No match results recorded yet. Complete a round in the Arena!</div></div>
+
+        <!-- DIVISION TABS -->
+        <div class="lb-tabs" style="display:flex;gap:8px;flex-wrap:wrap;margin:16px 0;">
+          <button type="button" class="btn btn-m2 lb-tab-btn active" data-lb="total" onclick="window.switchLbDivision('total')">👑 Total Championship</button>
+          <button type="button" class="btn lb-tab-btn" data-lb="1" onclick="window.switchLbDivision(1)">🟢 1. Chill Mode</button>
+          <button type="button" class="btn lb-tab-btn" data-lb="2" onclick="window.switchLbDivision(2)">🟡 2. Seriously?</button>
+          <button type="button" class="btn lb-tab-btn" data-lb="3" onclick="window.switchLbDivision(3)">🔴 3. Why So Serious?</button>
+          <button type="button" class="btn lb-tab-btn" data-lb="4" onclick="window.switchLbDivision(4)">🔥 4. Don't Scream</button>
+        </div>
+
+        <div id="lb-division-info" class="info-box" style="margin-bottom:16px;">
+          <strong id="lb-division-title">👑 Overall Championship: Total Game Played &amp; Master Score</strong>
+          <div id="lb-division-desc" class="muted" style="margin-top:4px;">Cumulative composure points across all played modes. Proves total mastery.</div>
+        </div>
+
+        <!-- LEADERBOARD PODIUM TOP 3 -->
+        <div id="lb-podium" class="podium-container" style="display:none;margin-bottom:20px;"></div>
+
+        <!-- LEADERBOARD TABLE -->
+        <div style="overflow-x:auto;">
+          <table class="board-table" style="width:100%;margin-bottom:24px;">
+            <thead id="lb-table-head">
+              <tr>
+                <th style="width:60px;">Rank</th>
+                <th>Master Player</th>
+                <th>Modes Conquered</th>
+                <th class="text-right">Peak Score</th>
+                <th class="text-right">Total Score</th>
+              </tr>
+            </thead>
+            <tbody id="lb-table-body">
+              <tr><td colspan="5" style="text-align:center;padding:20px;" class="muted">Loading live leaderboard data...</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- RECENT LOCAL MATCH RESULTS -->
+        <div class="card-head" style="margin-top:20px;border-top:1px solid rgba(255,255,255,0.08);padding-top:16px;">
+          <span>📋 Your Recent Round History (This Device)</span>
+          <button type="button" class="btn btn-danger" onclick="window.clearMyScores()" style="font-size:12px;padding:4px 10px;">Clear My History</button>
+        </div>
+        <div id="scoreboard-rows" style="margin-top:10px;"><div class="muted">No match results recorded yet. Complete a round in the Arena!</div></div>
       </div>
     </section>
 

@@ -140,7 +140,7 @@ const code = crypto.randomBytes(3).toString('hex').toUpperCase();
         const winner = hScore > gScore ? 'host' : gScore > hScore ? 'guest' : 'tie';
         
         // Kirim hasil
-        io.to(code).emit('game_result', { host: room.results.host, guest: room.results.guest, winner, hostName: room.hostName, guestName: room.guestName });
+        io.to(code).emit('game_result', { host: room.results.host, guest: room.results.guest, winner, hostName: room.hostName, guestName: room.guestName, level: room.level });
         console.log(`[game] room ${code} result: winner=${winner}`);
 
         // MATIKAN ANTI-CHEAT setelah game selesai

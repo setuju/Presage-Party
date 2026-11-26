@@ -34,6 +34,21 @@ try {
     )");
     $db->exec("CREATE INDEX IF NOT EXISTS idx_mode_score ON scores(mode_id, score DESC)");
     $db->exec("CREATE INDEX IF NOT EXISTS idx_name_score ON scores(name, score DESC)");
+
+    // Ensure 'ip' column exists even if table was created in an older version
+    try {
+        $cols = $db->query("PRAGMA table_info(scores)")->fetchAll(PDO::FETCH_ASSOC);
+        $hasIp = false;
+        foreach ($cols as $c) {
+            if (isset($c['name']) && $c['name'] === 'ip') {
+                $hasIp = true;
+                break;
+            }
+        }
+        if (!$hasIp) {
+            $db->exec("ALTER TABLE scores ADD COLUMN ip TEXT");
+        }
+    } catch (Exception $e) {}
 } catch (Exception $e) {
     http_response_code(500);
     echo json_encode(['error' => 'Database error']);
